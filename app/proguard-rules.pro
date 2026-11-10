@@ -1,0 +1,2 @@
+-keep class es.brujula.jitai.core.model.** { *; }
+-keepattributes *Annotation*

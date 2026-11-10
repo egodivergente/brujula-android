@@ -1,10 +1,15 @@
 package es.brujula.jitai.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,26 +17,37 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Air
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import es.brujula.jitai.core.designsystem.BrujulaDesign
 import es.brujula.jitai.core.designsystem.BrujulaEditorialHeader
@@ -40,12 +56,12 @@ import es.brujula.jitai.core.designsystem.BrujulaPrecisionScale
 import es.brujula.jitai.core.designsystem.BrujulaPrimaryButton
 import es.brujula.jitai.core.designsystem.BrujulaSurface
 import es.brujula.jitai.core.designsystem.BrujulaTagPill
+import es.brujula.jitai.core.designsystem.EditorialSerif
 import es.brujula.jitai.core.model.JitaiActionKind
 import es.brujula.jitai.core.model.JitaiDecisionRecord
 import es.brujula.jitai.core.model.SubstanceContextTag
 import es.brujula.jitai.ui.BrujulaUiState
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CheckInScreen(
     state: BrujulaUiState,
@@ -67,308 +83,387 @@ fun CheckInScreen(
     onDoneReturnHome: () -> Unit
 ) {
     val colors = BrujulaDesign.colors
-    val previous = state.checkIns.firstOrNull()
+    val latest = state.checkIns.firstOrNull()
 
-    var mood by remember { mutableIntStateOf(previous?.mood ?: 6) }
-    var craving by remember { mutableIntStateOf(previous?.craving ?: 3) }
-    var sexualDesire by remember { mutableIntStateOf(previous?.sexualDesire ?: 5) }
-    var perceivedControl by remember { mutableIntStateOf(previous?.perceivedControl ?: 7) }
-    var availableForSupport by remember { mutableStateOf(true) }
-    var isDriving by remember { mutableStateOf(false) }
-    var selectedSubstance by remember { mutableStateOf(SubstanceContextTag.NONE) }
-    var personalNote by remember { mutableStateOf("") }
+    var mood by rememberSaveable { mutableIntStateOf(latest?.mood ?: 6) }
+    var craving by rememberSaveable { mutableIntStateOf(latest?.craving ?: 2) }
+    var sexualDesire by rememberSaveable { mutableIntStateOf(latest?.sexualDesire ?: 5) }
+    var perceivedControl by rememberSaveable { mutableIntStateOf(latest?.perceivedControl ?: 7) }
+    var availableForSupport by rememberSaveable { mutableStateOf(true) }
+    var isDriving by rememberSaveable { mutableStateOf(false) }
+    var showNoteSection by rememberSaveable { mutableStateOf(false) }
+    var substanceTagName by rememberSaveable { mutableStateOf(SubstanceContextTag.NONE.name) }
+    var personalNote by rememberSaveable { mutableStateOf("") }
     var evaluatedDecision by remember { mutableStateOf<JitaiDecisionRecord?>(null) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
-            BrujulaEditorialHeader(
-                eyebrow = if (state.isReevaluationMode) {
-                    "Reevaluación voluntaria · 20 min"
-                } else {
-                    "Evaluación Ecológica Momentánea (EMA)"
-                },
-                title = "¿Cómo sientes tu rumbo ahora?",
-                subtitle = "Menos de 25 segundos. Tus respuestas quedan únicamente en este dispositivo y orientan herramientas explicables sin juzgarte."
-            )
-        }
+    val highIntensity = craving >= state.settings.cravingThreshold ||
+        perceivedControl <= state.settings.controlThreshold
 
-        // Resultado inmediato explicable tras guardar
-        item {
-            AnimatedVisibility(visible = evaluatedDecision != null) {
-                evaluatedDecision?.let { decision ->
-                    val isIntense = decision.actionKind == JitaiActionKind.CHOOSE_COPING_OR_HUMAN
-                    BrujulaSurface(
-                        containerColor = if (isIntense) colors.coralWash else colors.jadeWash,
-                        borderColor = if (isIntense) colors.coralAccent else colors.jadePrimary
+    val moodAuraColor by animateColorAsState(
+        targetValue = when {
+            craving >= state.settings.cravingThreshold -> colors.coralAccent
+            perceivedControl <= state.settings.controlThreshold -> colors.amberAccent
+            else -> colors.jadePrimary
+        },
+        animationSpec = tween(650),
+        label = "checkinAura"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        AnimatedContent(
+            targetState = evaluatedDecision,
+            label = "checkInTransition"
+        ) { decision ->
+            if (decision == null) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "REGISTRO GUARDADO · MOTOR JITAI EXPLICABLE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isIntense) colors.onCoralWash else colors.onJadeWash
+                        BrujulaEditorialHeader(
+                            title = if (state.isReevaluationMode) "¿Cómo sigue todo?" else "¿Cómo estás ahora?",
+                            subtitle = "Desliza suave, sin pensarlo demasiado.",
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = decision.headline,
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = colors.inkPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = decision.explanation,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.inkSecondary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = decision.ruleTrace,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.inkMuted
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (isIntense) {
-                                BrujulaPrimaryButton(
-                                    text = "Afrontamiento breve",
-                                    onClick = onOpenCopingSupport,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BrujulaGhostButton(
-                                    text = "Enfermería",
-                                    onClick = onOpenNurseContact
-                                )
-                                TextButton(onClick = { onRejectSuggestion4h(decision.id) }) {
-                                    Text("Pausar 4 h")
+                        // Pequeño orbe cromático vivo que refleja el pulso sin números
+                        Canvas(modifier = Modifier.size(44.dp)) {
+                            val c = Offset(size.width / 2f, size.height / 2f)
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(moodAuraColor.copy(alpha = 0.35f), Color.Transparent),
+                                    center = c,
+                                    radius = size.minDimension / 2f
+                                ),
+                                radius = size.minDimension / 2f,
+                                center = c
+                            )
+                            drawCircle(
+                                color = moodAuraColor,
+                                radius = 7.dp.toPx(),
+                                center = c
+                            )
+                        }
+                    }
+
+                    // Superficie única con los 4 deslizadores cualitativos (cero cifras frías)
+                    BrujulaSurface(contentPadding = PaddingValues(22.dp)) {
+                        BrujulaPrecisionScale(
+                            title = "Ánimo",
+                            value = mood,
+                            onValueChange = { mood = it },
+                            accentColor = colors.jadePrimary,
+                            qualitativeLabel = { v ->
+                                when (v) {
+                                    0, 1 -> "Apagado"
+                                    2, 3 -> "Bajo"
+                                    4, 5, 6 -> "Sereno"
+                                    7, 8 -> "Luminoso"
+                                    else -> "Pleno"
                                 }
+                            }
+                        )
+
+                        SoftScaleDivider()
+
+                        BrujulaPrecisionScale(
+                            title = "Impulso de consumir",
+                            value = craving,
+                            onValueChange = { craving = it },
+                            accentColor = if (craving >= state.settings.cravingThreshold) {
+                                colors.coralAccent
                             } else {
-                                BrujulaPrimaryButton(
-                                    text = "Volver a Mi brújula",
-                                    onClick = onDoneReturnHome,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BrujulaGhostButton(
-                                    text = "Ir a Apoyo",
-                                    onClick = onOpenCopingSupport
-                                )
+                                colors.amberAccent
+                            },
+                            qualitativeLabel = { v ->
+                                when (v) {
+                                    0, 1 -> "En calma"
+                                    2, 3 -> "Leve"
+                                    4, 5, 6 -> "Presente"
+                                    7, 8 -> "Fuerte"
+                                    else -> "Muy intenso"
+                                }
+                            }
+                        )
+
+                        SoftScaleDivider()
+
+                        BrujulaPrecisionScale(
+                            title = "Deseo sexual",
+                            subtitle = "Natural e independiente",
+                            value = sexualDesire,
+                            onValueChange = { sexualDesire = it },
+                            accentColor = colors.petroleumAccent,
+                            qualitativeLabel = { v ->
+                                when (v) {
+                                    0, 1 -> "Tranquilo"
+                                    2, 3 -> "Suave"
+                                    4, 5, 6 -> "Despierto"
+                                    7, 8 -> "Vivo"
+                                    else -> "Muy vivo"
+                                }
+                            }
+                        )
+
+                        SoftScaleDivider()
+
+                        BrujulaPrecisionScale(
+                            title = "Sensación de margen",
+                            value = perceivedControl,
+                            onValueChange = { perceivedControl = it },
+                            accentColor = if (perceivedControl <= state.settings.controlThreshold) {
+                                colors.coralAccent
+                            } else {
+                                colors.jadePrimary
+                            },
+                            qualitativeLabel = { v ->
+                                when (v) {
+                                    0, 1 -> "Desbordado"
+                                    2, 3 -> "Justo"
+                                    4, 5, 6 -> "Estable"
+                                    7, 8 -> "Con aire"
+                                    else -> "Con timón"
+                                }
+                            }
+                        )
+                    }
+
+                    // Píldoras horizontales ligeras para disponibilidad, conducción y nota opcional
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        BrujulaTagPill(
+                            label = if (availableForSupport) "Disponible ahora" else "Prefiero silencio",
+                            selected = availableForSupport,
+                            icon = Icons.Outlined.FavoriteBorder,
+                            onClick = { availableForSupport = !availableForSupport }
+                        )
+                        BrujulaTagPill(
+                            label = "Conduciendo",
+                            selected = isDriving,
+                            accentColor = colors.amberAccent,
+                            washColor = colors.amberWash,
+                            icon = Icons.Outlined.DirectionsCar,
+                            onClick = { isDriving = !isDriving }
+                        )
+                        BrujulaTagPill(
+                            label = "Nota breve",
+                            selected = showNoteSection || personalNote.isNotBlank(),
+                            icon = Icons.Outlined.EditNote,
+                            onClick = { showNoteSection = !showNoteSection }
+                        )
+                    }
+
+                    AnimatedVisibility(visible = showNoteSection) {
+                        BrujulaSurface(contentPadding = PaddingValues(18.dp)) {
+                            OutlinedTextField(
+                                value = personalNote,
+                                onValueChange = { personalNote = it },
+                                label = { Text("Algo que quieras anotar para ti (opcional)") },
+                                singleLine = false,
+                                maxLines = 3,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                SubstanceContextTag.entries.forEach { tag ->
+                                    BrujulaTagPill(
+                                        label = tag.label,
+                                        selected = substanceTagName == tag.name,
+                                        onClick = { substanceTagName = tag.name }
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            }
-        }
 
-        // Escalas táctiles 0-10
-        item {
-            BrujulaSurface {
-                BrujulaPrecisionScale(
-                    title = "1. Estado de ánimo",
-                    subtitle = "Sensación emocional y energía general en este momento",
-                    value = mood,
-                    onValueChange = { mood = it },
-                    minAnchorLabel = "0 · Muy bajo / agotado",
-                    maxAnchorLabel = "10 · Sereno y vital",
-                    accentColor = colors.jadePrimary
-                )
+                    BrujulaPrimaryButton(
+                        text = "Guardar en mi brújula",
+                        icon = Icons.Outlined.Check,
+                        containerColor = if (highIntensity) colors.coralAccent else colors.jadePrimary,
+                        contentColor = Color.White,
+                        onClick = {
+                            val selectedTag = runCatching {
+                                SubstanceContextTag.valueOf(substanceTagName)
+                            }.getOrDefault(SubstanceContextTag.NONE)
 
-                Spacer(modifier = Modifier.height(18.dp))
-                HorizontalDivider(color = colors.borderHairline)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                val cravingColor = when {
-                    craving >= state.settings.cravingThreshold -> colors.coralAccent
-                    craving >= 4 -> colors.amberAccent
-                    else -> colors.jadePrimary
-                }
-                BrujulaPrecisionScale(
-                    title = "2. Deseo de consumir (craving)",
-                    subtitle = "Umbral experimental actual: ≥${state.settings.cravingThreshold}/10",
-                    value = craving,
-                    onValueChange = { craving = it },
-                    minAnchorLabel = "0 · Ausente",
-                    maxAnchorLabel = "10 · Ola muy intensa",
-                    accentColor = cravingColor
-                )
-
-                if (!state.settings.discreetModeEnabled && craving >= 3) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Sustancia asociada (opcional):",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colors.inkMuted
+                            onSubmitCheckIn(
+                                mood,
+                                craving,
+                                sexualDesire,
+                                perceivedControl,
+                                availableForSupport,
+                                isDriving,
+                                selectedTag,
+                                personalNote,
+                                state.isReevaluationMode
+                            ) { evaluated ->
+                                evaluatedDecision = evaluated
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        verticalArrangement = Arrangement.spacedBy(7.dp)
-                    ) {
-                        SubstanceContextTag.entries.forEach { tag ->
-                            BrujulaTagPill(
-                                label = tag.label,
-                                selected = selectedSubstance == tag,
-                                onClick = { selectedSubstance = tag }
-                            )
-                        }
-                    }
                 }
-
-                Spacer(modifier = Modifier.height(18.dp))
-                HorizontalDivider(color = colors.borderHairline)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                BrujulaPrecisionScale(
-                    title = "3. Deseo sexual (independiente)",
-                    subtitle = "Se valora por separado; el deseo sexual aislado nunca activa avisos",
-                    value = sexualDesire,
-                    onValueChange = { sexualDesire = it },
-                    minAnchorLabel = "0 · Bajo ahora",
-                    maxAnchorLabel = "10 · Intenso / presente",
-                    accentColor = colors.petroleumAccent
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-                HorizontalDivider(color = colors.borderHairline)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                val controlColor = when {
-                    perceivedControl <= state.settings.controlThreshold -> colors.coralAccent
-                    perceivedControl <= 5 -> colors.amberAccent
-                    else -> colors.jadePrimary
-                }
-                BrujulaPrecisionScale(
-                    title = "4. Control percibido sobre el consumo",
-                    subtitle = "Umbral experimental actual: ≤${state.settings.controlThreshold}/10",
-                    value = perceivedControl,
-                    onValueChange = { perceivedControl = it },
-                    minAnchorLabel = "0 · Poco margen hoy",
-                    maxAnchorLabel = "10 · Con pleno timón",
-                    accentColor = controlColor
+            } else {
+                // Tarjeta de acogida serena tras guardar el check-in
+                CalmCheckInResponseView(
+                    decision = decision,
+                    accentColor = moodAuraColor,
+                    onOpenCopingSupport = onOpenCopingSupport,
+                    onOpenNurseContact = onOpenNurseContact,
+                    onRejectSuggestion4h = {
+                        onRejectSuggestion4h(decision.id)
+                        onDoneReturnHome()
+                    },
+                    onDoneReturnHome = onDoneReturnHome,
+                    onEditAgain = { evaluatedDecision = null }
                 )
             }
         }
 
-        // Disponibilidad y seguridad vial (receptividad JITAI §2.2 / §2.3)
-        item {
-            BrujulaSurface {
-                Text(
-                    text = "5. Receptividad y contexto seguro",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.inkPrimary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+    }
+}
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.NotificationsActive,
-                            contentDescription = null,
-                            tint = colors.jadePrimary
-                        )
-                        Column(modifier = Modifier.padding(start = 10.dp, end = 8.dp)) {
-                            Text(
-                                text = "Disponible para acompañamiento breve",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.inkPrimary
-                            )
-                            Text(
-                                text = "Si necesitas silencio ahora, no se desplegarán propuestas automáticas.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.inkMuted
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = availableForSupport,
-                        onCheckedChange = { availableForSupport = it }
+@Composable
+private fun SoftScaleDivider() {
+    val colors = BrujulaDesign.colors
+    Spacer(modifier = Modifier.height(16.dp))
+    HorizontalDivider(color = colors.borderHairline.copy(alpha = 0.45f), thickness = 0.6.dp)
+    Spacer(modifier = Modifier.height(16.dp))
+}
+
+@Composable
+private fun CalmCheckInResponseView(
+    decision: JitaiDecisionRecord,
+    accentColor: Color,
+    onOpenCopingSupport: () -> Unit,
+    onOpenNurseContact: () -> Unit,
+    onRejectSuggestion4h: () -> Unit,
+    onDoneReturnHome: () -> Unit,
+    onEditAgain: () -> Unit
+) {
+    val colors = BrujulaDesign.colors
+
+    BrujulaSurface(
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(92.dp)
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val c = Offset(size.width / 2f, size.height / 2f)
+                    val r = size.minDimension / 2f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(accentColor.copy(alpha = 0.26f), Color.Transparent),
+                            center = c,
+                            radius = r
+                        ),
+                        radius = r,
+                        center = c
+                    )
+                    drawCircle(
+                        color = accentColor.copy(alpha = 0.45f),
+                        radius = r * 0.64f,
+                        center = c,
+                        style = Stroke(width = 1.2.dp.toPx())
+                    )
+                    drawCircle(
+                        color = accentColor,
+                        radius = 10.dp.toPx(),
+                        center = c
                     )
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-                HorizontalDivider(color = colors.borderHairline)
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.DirectionsCar,
-                            contentDescription = null,
-                            tint = colors.amberAccent
-                        )
-                        Column(modifier = Modifier.padding(start = 10.dp, end = 8.dp)) {
-                            Text(
-                                text = "Estoy conduciendo en este momento",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.inkPrimary
-                            )
-                            Text(
-                                text = "Por seguridad vial, conducir bloquea cualquier intervención activa.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.inkMuted
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = isDriving,
-                        onCheckedChange = { isDriving = it }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = personalNote,
-                    onValueChange = { personalNote = it },
-                    label = { Text("Nota breve para ti (opcional)") },
-                    placeholder = { Text("Ej. Salgo cansado de guardia; me apetece descansar") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-                BrujulaPrimaryButton(
-                    text = if (state.isReevaluationMode) {
-                        "Guardar reevaluación de 20 min"
-                    } else {
-                        "Guardar check-in y actualizar brújula"
-                    },
-                    icon = Icons.Outlined.Check,
-                    onClick = {
-                        onSubmitCheckIn(
-                            mood,
-                            craving,
-                            sexualDesire,
-                            perceivedControl,
-                            availableForSupport,
-                            isDriving,
-                            selectedSubstance,
-                            personalNote,
-                            state.isReevaluationMode
-                        ) { decision ->
-                            evaluatedDecision = decision
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
+
             Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = decision.headline,
+                style = MaterialTheme.typography.headlineMedium.copy(fontFamily = EditorialSerif),
+                color = colors.inkPrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = decision.explanation,
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.inkSecondary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (decision.actionKind == JitaiActionKind.CHOOSE_COPING_OR_HUMAN) {
+                BrujulaPrimaryButton(
+                    text = "Respirar un momento",
+                    icon = Icons.Outlined.Air,
+                    onClick = onOpenCopingSupport,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                BrujulaGhostButton(
+                    text = "Contactar con enfermería",
+                    icon = Icons.Outlined.SupportAgent,
+                    onClick = onOpenNurseContact,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Ahora no · pausar avisos 4 h",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.inkMuted,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable(onClick = onRejectSuggestion4h)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            } else {
+                BrujulaPrimaryButton(
+                    text = "Volver a mi brújula",
+                    onClick = onDoneReturnHome,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                BrujulaGhostButton(
+                    text = "Hacer una respiración suave",
+                    icon = Icons.Outlined.Air,
+                    onClick = onOpenCopingSupport,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "Ajustar mi respuesta",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.inkMuted,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onEditAgain)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            )
         }
     }
 }

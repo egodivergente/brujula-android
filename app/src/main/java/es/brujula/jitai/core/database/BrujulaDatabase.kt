@@ -19,12 +19,11 @@ import kotlinx.coroutines.launch
         EmaCheckInEntity::class,
         PersonalZoneEntity::class,
         DayPlanItemEntity::class,
-        GhbVoluntaryLogEntity::class,
         CopingSessionLogEntity::class,
         MilestoneReflectionEntity::class,
         JitaiDecisionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class BrujulaDatabase : RoomDatabase() {
@@ -40,7 +39,7 @@ abstract class BrujulaDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     BrujulaDatabase::class.java,
-                    "brujula_local_v1.db"
+                    "brujula_local_v2.db"
                 )
                     .addCallback(SeedCallback(scope))
                     .fallbackToDestructiveMigration()
@@ -71,7 +70,6 @@ suspend fun seedInitialDataIfEmpty(dao: BrujulaDao) {
     val hour = 3_600_000L
     val day = 24 * hour
 
-    // 1. Evolución EMA realista (incluye ejemplo de deseo sexual alto sin craving -> cero alertas)
     val sampleCheckIns = listOf(
         EmaCheckInEntity(
             timestampMillis = now - 4 * day,
@@ -81,8 +79,8 @@ suspend fun seedInitialDataIfEmpty(dao: BrujulaDao) {
             perceivedControl = 6,
             availableForSupport = true,
             isDriving = false,
-            substanceTag = SubstanceContextTag.MEPHEDRONE.name,
-            personalNote = "Semana densa de trabajo; cansancio al salir.",
+            substanceTag = SubstanceContextTag.STIMULANTS.name,
+            personalNote = "Tarde cansada tras el trabajo.",
             isReevaluation = false
         ),
         EmaCheckInEntity(
@@ -94,19 +92,19 @@ suspend fun seedInitialDataIfEmpty(dao: BrujulaDao) {
             availableForSupport = true,
             isDriving = false,
             substanceTag = SubstanceContextTag.NONE.name,
-            personalNote = "Cita tranquila; deseo presente y buen timón personal.",
+            personalNote = "Noche tranquila y buen ánimo.",
             isReevaluation = false
         ),
         EmaCheckInEntity(
             timestampMillis = now - 2 * day,
-            mood = 5,
-            craving = 6,
+            mood = 6,
+            craving = 4,
             sexualDesire = 5,
-            perceivedControl = 5,
+            perceivedControl = 7,
             availableForSupport = true,
             isDriving = false,
-            substanceTag = SubstanceContextTag.METHAMPHETAMINE.name,
-            personalNote = "Viernes tarde; activé plan alternativo con paseo.",
+            substanceTag = SubstanceContextTag.NONE.name,
+            personalNote = "Salí a caminar sin pantallas.",
             isReevaluation = false
         ),
         EmaCheckInEntity(
@@ -118,104 +116,93 @@ suspend fun seedInitialDataIfEmpty(dao: BrujulaDao) {
             availableForSupport = true,
             isDriving = false,
             substanceTag = SubstanceContextTag.NONE.name,
-            personalNote = "Descansado y con margen amplio para hoy.",
+            personalNote = "Descansado y en calma.",
             isReevaluation = false
         )
     )
     sampleCheckIns.forEach { dao.insertCheckIn(it) }
 
-    // 2. Zonas personales configurables (procesamiento exclusivamente en el dispositivo)
     val sampleZones = listOf(
         PersonalZoneEntity(
-            name = "Parque / Paseo de despeje",
+            name = "Paseo del parque",
             category = ZoneCategory.GREEN.name,
             relativeX = -0.42f,
-            relativeY = -0.35f,
+            relativeY = -0.34f,
             latitude = 40.4153,
             longitude = -3.6845,
             radiusMeters = 320,
-            anchorReminder = "Caminar 15 minutos sin auriculares me devuelve calma.",
+            anchorReminder = "Caminar despacio quince minutos me despeja.",
             enabled = true
         ),
         PersonalZoneEntity(
-            name = "Casa de Dani · Red de confianza",
+            name = "Casa de Dani",
             category = ZoneCategory.GREEN.name,
-            relativeX = 0.38f,
+            relativeX = 0.36f,
             relativeY = -0.22f,
             latitude = 40.4220,
             longitude = -3.6980,
-            radiusMeters = 220,
-            anchorReminder = "Espacio donde puedo hablar sin filtros ni juicios.",
+            radiusMeters = 240,
+            anchorReminder = "Un lugar tranquilo donde hablar sin juicio.",
             enabled = true
         ),
         PersonalZoneEntity(
-            name = "Zona de ocio nocturno · Viernes",
+            name = "Zona de ocio nocturno",
             category = ZoneCategory.YELLOW.name,
-            relativeX = 0.14f,
+            relativeX = 0.16f,
             relativeY = 0.28f,
             latitude = 40.4202,
             longitude = -3.7058,
             radiusMeters = 300,
-            anchorReminder = "Si paso por aquí cansado, conviene hacer un check-in breve.",
+            anchorReminder = "Parar un segundo y ver qué me apetece de verdad.",
             enabled = true
         ),
         PersonalZoneEntity(
-            name = "Entorno habitual de sesión larga",
+            name = "Entorno de madrugada",
             category = ZoneCategory.RED.name,
             relativeX = -0.28f,
-            relativeY = 0.46f,
+            relativeY = 0.44f,
             latitude = 40.4095,
             longitude = -3.7012,
-            radiusMeters = 240,
-            anchorReminder = "Recuerda tu meta de descansar el domingo; puedes pedir apoyo.",
+            radiusMeters = 250,
+            anchorReminder = "Mañana quiero despertarme descansado.",
             enabled = true
         )
     )
     sampleZones.forEach { dao.upsertZone(it) }
 
-    // 3. Planificación flexible Mi día (actividades y alternativas ante ventanas vulnerables)
     val samplePlan = listOf(
         DayPlanItemEntity(
-            title = "Entrenamiento suave e hidratación",
+            title = "Movimiento suave y desayuno tranquilo",
             timeBlock = DayTimeBlock.MORNING.name,
-            timeLabel = "10:30 h",
+            timeLabel = "10:00",
             isVulnerableWindow = false,
-            chosenAlternative = "Estiramientos de 10 min en casa si llueve",
+            chosenAlternative = "Estirar diez minutos junto a la ventana",
             completed = true
         ),
         DayPlanItemEntity(
-            title = "Revisión rápida de rumbo personal",
-            timeBlock = DayTimeBlock.AFTERNOON.name,
-            timeLabel = "18:30 h",
-            isVulnerableWindow = false,
-            chosenAlternative = "Completar Check-in EMA de 20 segundos",
-            completed = false
-        ),
-        DayPlanItemEntity(
-            title = "Salida del trabajo con fatiga acumulada",
+            title = "Caída de la tarde con cansancio",
             timeBlock = DayTimeBlock.NIGHT.name,
-            timeLabel = "22:00 – 00:30 h",
+            timeLabel = "21:30",
             isVulnerableWindow = true,
-            chosenAlternative = "Ducha templada, cenar caliente y escribir a Dani antes de abrir apps",
+            chosenAlternative = "Ducha templada, cena rica y escribir a Dani",
             completed = false
         ),
         DayPlanItemEntity(
-            title = "Insomnio o notificaciones de madrugada",
+            title = "Si me desvelo de madrugada",
             timeBlock = DayTimeBlock.LATE_NIGHT.name,
-            timeLabel = "01:30 – 04:00 h",
+            timeLabel = "01:30",
             isVulnerableWindow = true,
-            chosenAlternative = "Modo silencio 30 min + respiración 4-2-6 + cine tranquilo en salón",
+            chosenAlternative = "Dejar el móvil fuera, respirar 4·2·6 y luz cálida",
             completed = false
         )
     )
     samplePlan.forEach { dao.upsertDayPlanItem(it) }
 
-    // 4. Práctica previa de habilidad y evaluación basal Semana 0
     dao.insertCopingSession(
         CopingSessionLogEntity(
             timestampMillis = now - 2 * day + hour,
             toolId = "physiological_sigh",
-            toolTitle = "Respiración fisiológica 4-2-6",
+            toolTitle = "Suspiro suave 4 · 2 · 6",
             durationSeconds = 180,
             helpfulRating = 5
         )
@@ -225,11 +212,11 @@ suspend fun seedInitialDataIfEmpty(dao: BrujulaDao) {
         MilestoneReflectionEntity(
             checkpointWeek = 0,
             timestampMillis = now - 21 * day,
-            daysUsedLastMonth = 6,
-            lossOfControlEpisodes = 3,
-            wellbeingScore = 5,
-            goalAttainmentScore = 5,
-            reflectionNote = "Inicio pactado con enfermería: priorizar sueño, hidratación y reducir sesiones largas."
+            daysUsedLastMonth = 5,
+            lossOfControlEpisodes = 2,
+            wellbeingScore = 6,
+            goalAttainmentScore = 6,
+            reflectionNote = "Quiero cuidar mi sueño y recuperar fines de semana tranquilos."
         )
     )
 
@@ -238,9 +225,9 @@ suspend fun seedInitialDataIfEmpty(dao: BrujulaDao) {
             timestampMillis = now - 5 * hour,
             triggerSource = JitaiTriggerSource.EMA_COMPLETED.name,
             actionKind = JitaiActionKind.NONE.name,
-            headline = "Rumbo estable registrado",
-            explanation = "Craving 2/10 y control percibido 8/10: no se activa intervención automática; las herramientas siguen abiertas manualmente.",
-            ruleTrace = "Regla v1: craving < 7 y control > 3 · Deseo sexual evaluado por separado sin activar avisos.",
+            headline = "Aguas tranquilas",
+            explanation = "Todo en calma; tus espacios de respiro siguen aquí cuando quieras.",
+            ruleTrace = "Regla v1: parámetros dentro de margen personal · deseo sexual independiente.",
             wasNotified = false,
             userResponse = "REVISADO"
         )

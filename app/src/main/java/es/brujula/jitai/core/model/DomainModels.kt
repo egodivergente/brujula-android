@@ -3,29 +3,29 @@ package es.brujula.jitai.core.model
 import kotlinx.serialization.Serializable
 
 enum class ThemePreference(val label: String) {
-    SYSTEM("Automático del sistema"),
-    LIGHT("Claro · Marfil cálido"),
-    DARK("Oscuro · Petróleo nocturno")
+    SYSTEM("Automático"),
+    LIGHT("Claro marfil"),
+    DARK("Noche petróleo")
 }
 
 enum class ProgramGoalType(val title: String, val summary: String) {
     HARM_REDUCTION(
-        "Reducción de daños y mayor margen",
-        "Disminuir episodios de pérdida de control, cuidar descansos y proteger mi bienestar integral."
+        "Cuidar mis márgenes",
+        "Ganar calma, proteger mi descanso y reducir momentos de desborde."
     ),
     TEMPORARY_PAUSE(
-        "Pausa temporal pactada",
-        "Tomar distancia durante las próximas semanas revisando herramientas con enfermería."
+        "Tomarme una pausa",
+        "Abrir espacio durante unas semanas a mi propio ritmo."
     ),
     ABSTINENCE(
-        "Abstinencia acompañada",
-        "Sostener días sin consumo con alternativas elegidas, sin culpabilizar si ocurre un tropiezo."
+        "Caminar sin consumo",
+        "Sostener mis días con apoyo cercano, sin culpa si hay un tropiezo."
     )
 }
 
 /**
  * Representación visual no diagnóstica de la brújula según el último autoinforme o contexto.
- * Nunca etiqueta patología; refleja el rumbo percibido por la propia persona.
+ * Nunca etiqueta patología; refleja suavemente el rumbo percibido.
  */
 enum class CompassBearingState(
     val shortTitle: String,
@@ -33,33 +33,32 @@ enum class CompassBearingState(
     val targetAzimuthDeg: Float
 ) {
     SERENE_HORIZON(
-        shortTitle = "Rumbo sereno",
-        poeticReading = "Cuentas con margen amplio para elegir tu ritmo hoy.",
-        targetAzimuthDeg = 18f
+        shortTitle = "Aguas tranquilas",
+        poeticReading = "Hay espacio y calma para elegir tu ritmo.",
+        targetAzimuthDeg = 16f
     ),
     VITAL_AUTONOMY(
-        shortTitle = "Energía y deseo autónomo",
-        poeticReading = "El deseo sexual forma parte de tu vitalidad y no activa alertas clínicas.",
-        targetAzimuthDeg = 52f
+        shortTitle = "Pulso vital",
+        poeticReading = "Tu energía y tu deseo te pertenecen, en calma.",
+        targetAzimuthDeg = 48f
     ),
     ATTENTIVE_BREEZE(
         shortTitle = "Brisa cambiante",
-        poeticReading = "Momento sensible: bajar media marcha puede darte más claridad.",
-        targetAzimuthDeg = 318f
+        poeticReading = "Bajar media marcha puede devolverte claridad.",
+        targetAzimuthDeg = 320f
     ),
     INTENSE_SWELL(
         shortTitle = "Oleaje intenso",
-        poeticReading = "Tu registro indica intensidad; aquí tienes anclaje breve o apoyo humano si lo deseas.",
-        targetAzimuthDeg = 285f
+        poeticReading = "Respira aquí un instante; no tienes que decidir deprisa.",
+        targetAzimuthDeg = 286f
     )
 }
 
 enum class SubstanceContextTag(val label: String) {
-    NONE("Prefiero no indicar"),
-    METHAMPHETAMINE("Metanfetamina"),
-    MEPHEDRONE("Mefedrona"),
-    GHB_GBL("GHB / GBL"),
-    COMBINED("Contexto combinado")
+    NONE("Sin especificar"),
+    STIMULANTS("Estimulantes"),
+    COMBINED("Combinado"),
+    OTHER("Otro contexto")
 }
 
 @Serializable
@@ -83,19 +82,19 @@ enum class ZoneCategory(
     val clinicalMeaning: String
 ) {
     GREEN(
-        title = "Zona verde · Apoyo",
-        shortBadge = "Verde",
-        clinicalMeaning = "Espacio protector, descanso, red afectiva o actividad saludable."
+        title = "Espacio refugio",
+        shortBadge = "Refugio",
+        clinicalMeaning = "Lugar que te aporta descanso, calma o buena compañía."
     ),
     YELLOW(
-        title = "Zona amarilla · Vulnerabilidad",
-        shortBadge = "Amarilla",
-        clinicalMeaning = "Contexto que puede invitar a parar un segundo y comprobar cómo estás."
+        title = "Zona de atención",
+        shortBadge = "Atención",
+        clinicalMeaning = "Un entorno donde viene bien parar un segundo y escucharte."
     ),
     RED(
-        title = "Zona roja · Desencadenante",
-        shortBadge = "Roja",
-        clinicalMeaning = "Entorno relevante configurado por ti; solo sugiere un check-in voluntario sin inferir consumo."
+        title = "Zona sensible",
+        shortBadge = "Sensible",
+        clinicalMeaning = "Solo te invita suavemente a ver cómo estás, sin dar nada por hecho."
     )
 }
 
@@ -114,10 +113,10 @@ data class PersonalZone(
 )
 
 enum class DayTimeBlock(val label: String, val hoursHint: String) {
-    MORNING("Mañana", "08:00 – 14:00"),
-    AFTERNOON("Tarde", "14:00 – 20:00"),
-    NIGHT("Noche", "20:00 – 01:00"),
-    LATE_NIGHT("Madrugada", "01:00 – 08:00")
+    MORNING("Mañana", "09:00"),
+    AFTERNOON("Tarde", "17:30"),
+    NIGHT("Noche", "22:00"),
+    LATE_NIGHT("Madrugada", "01:30")
 }
 
 @Serializable
@@ -132,20 +131,13 @@ data class DayPlanItem(
 )
 
 @Serializable
-data class GhbVoluntaryLog(
-    val id: Long = 0,
-    val timestampMillis: Long,
-    val contextNote: String = ""
-)
-
-@Serializable
 data class CopingSessionLog(
     val id: Long = 0,
     val timestampMillis: Long,
     val toolId: String,
     val toolTitle: String,
     val durationSeconds: Int,
-    val helpfulRating: Int? = null // 1..5 opcional para revisión semanal CAME D1->C1
+    val helpfulRating: Int? = null
 )
 
 @Serializable
@@ -161,11 +153,11 @@ data class MilestoneReflection(
 )
 
 enum class JitaiTriggerSource(val label: String) {
-    EMA_COMPLETED("Tras check-in EMA"),
-    TWENTY_MIN_REEVAL("Reevaluación voluntaria (20 min)"),
-    ZONE_ENTRY("Entrada en zona contextual"),
-    VULNERABLE_SLOT("Inicio de franja sensible"),
-    MANUAL_REQUEST("Consulta manual")
+    EMA_COMPLETED("Check-in"),
+    TWENTY_MIN_REEVAL("Pausa 20 min"),
+    ZONE_ENTRY("Zona cercana"),
+    VULNERABLE_SLOT("Momento sensible"),
+    MANUAL_REQUEST("Manual")
 }
 
 enum class JitaiActionKind {
@@ -187,27 +179,27 @@ data class JitaiDecisionRecord(
     val explanation: String,
     val ruleTrace: String,
     val wasNotified: Boolean = false,
-    val userResponse: String = "PENDIENTE" // ACEPTADO, POSPUESTO_4H, REVISADO
+    val userResponse: String = "PENDIENTE"
 )
 
 @Serializable
 data class NurseNavigatorProfile(
-    val nurseName: String = "Elena Martín · Enfermera navegadora",
-    val centerName: String = "CAD / Unidad Ambulatoria de Salud Sexual y Adicciones",
+    val nurseName: String = "Elena Martín · Enfermera referente",
+    val centerName: String = "Unidad de Salud Sexual y Acompañamiento",
     val phone: String = "+34 910 00 12 34",
-    val contactChannelNote: String = "Mensajería clínica asíncrona y cita telefónica pactada",
-    val scheduleLabel: String = "Lunes a viernes · 09:00 – 17:00 h",
-    val responseSlaLabel: String = "Respuesta habitual en ≤ 1 día laborable (sin vigilancia 24 h)"
+    val contactChannelNote: String = "Contacto directo en horario asistencial",
+    val scheduleLabel: String = "Lunes a viernes · 09:00 – 17:00",
+    val responseSlaLabel: String = "Respuesta habitual en el día laborable"
 )
 
 @Serializable
 data class JitaiExperimentalSettings(
-    val cravingThreshold: Int = 7,           // Hipótesis experimental: >= 7/10
-    val controlThreshold: Int = 3,           // Hipótesis experimental: <= 3/10
-    val maxDailyNotifications: Int = 2,      // Tope estricto diario: máx. 2
-    val quietHoursStartHour: Int = 23,       // 23:00
-    val quietHoursEndHour: Int = 8,          // 08:00
-    val rejectionPauseHours: Int = 4,        // 4 horas tras rechazo
+    val cravingThreshold: Int = 7,
+    val controlThreshold: Int = 3,
+    val maxDailyNotifications: Int = 2,
+    val quietHoursStartHour: Int = 23,
+    val quietHoursEndHour: Int = 8,
+    val rejectionPauseHours: Int = 4,
     val pausedUntilMillis: Long = 0L,
     val reevalDueAtMillis: Long = 0L,
     val notificationsSentToday: Int = 0,
@@ -218,19 +210,20 @@ data class JitaiExperimentalSettings(
     val hapticsEnabled: Boolean = true,
     val largeTextEnabled: Boolean = false,
     val themePreference: ThemePreference = ThemePreference.SYSTEM,
-    val personalMotto: String = "Orientarme sin juzgarme; elegir mi próximo paso.",
+    val personalMotto: String = "Respiro primero; elijo mi siguiente paso.",
     val programGoal: ProgramGoalType = ProgramGoalType.HARM_REDUCTION,
     val currentProgramWeek: Int = 4,
     val activeZoneId: Long? = null,
     val ruleVersion: Int = 1,
     val ruleChangeHistory: List<String> = listOf(
-        "v1 · Reglas iniciales pactadas: craving ≥7/10 o control ≤3/10, máx. 2 avisos/día, pausa 4 h."
+        "v1 · Sensibilidad inicial: impulso ≥7/10 o margen ≤3/10, máx. 2 avisos/día, pausa 4 h."
     )
 )
 
 data class BreathingPattern(
     val id: String,
     val title: String,
+    val shortTag: String,
     val subtitle: String,
     val inhaleSec: Int,
     val holdAfterInhaleSec: Int,
@@ -278,7 +271,7 @@ data class AgreedClinicalSummaryExport(
     val averageCraving: Float,
     val averagePerceivedControl: Float,
     val copingSessionsCompleted: Int,
-    val configuredZonesCount: Int, // Coordenadas omitidas deliberadamente por privacidad CAME F3->M3
+    val configuredZonesCount: Int,
     val ruleVersion: Int,
     val thresholdsSummary: String,
     val milestoneReflections: List<MilestoneReflection>

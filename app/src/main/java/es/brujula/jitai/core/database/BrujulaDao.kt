@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BrujulaDao {
-    // EMA Check-ins
     @Query("SELECT * FROM ema_checkins ORDER BY timestampMillis DESC")
     fun observeCheckIns(): Flow<List<EmaCheckInEntity>>
 
@@ -19,7 +18,6 @@ interface BrujulaDao {
     @Query("SELECT COUNT(*) FROM ema_checkins")
     suspend fun countCheckIns(): Int
 
-    // Zonas personales
     @Query("SELECT * FROM personal_zones ORDER BY id ASC")
     fun observeZones(): Flow<List<PersonalZoneEntity>>
 
@@ -29,7 +27,6 @@ interface BrujulaDao {
     @Query("DELETE FROM personal_zones WHERE id = :zoneId")
     suspend fun deleteZone(zoneId: Long)
 
-    // Planificación flexible (Mi día)
     @Query("SELECT * FROM day_plan_items ORDER BY id ASC")
     fun observeDayPlan(): Flow<List<DayPlanItemEntity>>
 
@@ -42,34 +39,18 @@ interface BrujulaDao {
     @Query("DELETE FROM day_plan_items WHERE id = :itemId")
     suspend fun deleteDayPlanItem(itemId: Long)
 
-    // Registro voluntario GHB/GBL
-    @Query("SELECT * FROM ghb_logs ORDER BY timestampMillis DESC")
-    fun observeGhbLogs(): Flow<List<GhbVoluntaryLogEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertGhbLog(entity: GhbVoluntaryLogEntity): Long
-
-    @Query("DELETE FROM ghb_logs WHERE id = :logId")
-    suspend fun deleteGhbLog(logId: Long)
-
-    @Query("DELETE FROM ghb_logs")
-    suspend fun clearAllGhbLogs()
-
-    // Práctica de afrontamiento y respiración
     @Query("SELECT * FROM coping_sessions ORDER BY timestampMillis DESC")
     fun observeCopingSessions(): Flow<List<CopingSessionLogEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCopingSession(entity: CopingSessionLogEntity): Long
 
-    // Hitos de evaluación semanas 0, 6 y 12
     @Query("SELECT * FROM milestone_reflections ORDER BY checkpointWeek ASC, timestampMillis DESC")
     fun observeMilestoneReflections(): Flow<List<MilestoneReflectionEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMilestoneReflection(entity: MilestoneReflectionEntity): Long
 
-    // Trazabilidad del motor JITAI
     @Query("SELECT * FROM jitai_decisions ORDER BY timestampMillis DESC LIMIT 40")
     fun observeJitaiDecisions(): Flow<List<JitaiDecisionEntity>>
 
@@ -79,7 +60,6 @@ interface BrujulaDao {
     @Query("UPDATE jitai_decisions SET userResponse = :response WHERE id = :decisionId")
     suspend fun updateDecisionResponse(decisionId: Long, response: String)
 
-    // Eliminación integral local (RGPD / Privacidad desde el diseño)
     @Query("DELETE FROM ema_checkins")
     suspend fun clearCheckIns()
 

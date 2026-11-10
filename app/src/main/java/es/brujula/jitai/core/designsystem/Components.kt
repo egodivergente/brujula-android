@@ -31,7 +31,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,9 +60,9 @@ import kotlin.math.roundToInt
 fun BrujulaSurface(
     modifier: Modifier = Modifier,
     containerColor: Color = BrujulaDesign.colors.surfaceElevated,
-    borderColor: Color = BrujulaDesign.colors.borderHairline,
-    cornerRadius: Dp = 16.dp,
-    contentPadding: PaddingValues = PaddingValues(16.dp),
+    borderColor: Color = BrujulaDesign.colors.borderHairline.copy(alpha = 0.55f),
+    cornerRadius: Dp = 24.dp,
+    contentPadding: PaddingValues = PaddingValues(20.dp),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -71,7 +71,7 @@ fun BrujulaSurface(
     val baseModifier = modifier
         .clip(shape)
         .background(containerColor, shape)
-        .border(0.85.dp, borderColor, shape)
+        .border(0.6.dp, borderColor, shape)
         .then(
             if (onClick != null) {
                 Modifier.clickable(role = Role.Button) {
@@ -92,7 +92,7 @@ fun BrujulaSurface(
 
 @Composable
 fun BrujulaEditorialHeader(
-    eyebrow: String,
+    eyebrow: String = "",
     title: String,
     subtitle: String? = null,
     trailingActionLabel: String? = null,
@@ -109,37 +109,29 @@ fun BrujulaEditorialHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = eyebrow.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.jadePrimary
+                text = title,
+                style = MaterialTheme.typography.displaySmall,
+                color = colors.inkPrimary,
+                modifier = Modifier.weight(1f)
             )
             if (trailingActionLabel != null && onTrailingAction != null) {
-                Text(
-                    text = trailingActionLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.jadePrimary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptics.click()
-                            onTrailingAction()
-                        }
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                Spacer(modifier = Modifier.width(12.dp))
+                BrujulaTagPill(
+                    label = trailingActionLabel,
+                    selected = true,
+                    onClick = {
+                        haptics.click()
+                        onTrailingAction()
+                    }
                 )
             }
         }
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = colors.inkPrimary
-        )
         if (!subtitle.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = colors.inkSecondary
+                color = colors.inkMuted
             )
         }
     }
@@ -181,12 +173,12 @@ fun BrujulaSectionTitle(
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.jadePrimary,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(50))
                     .clickable {
                         haptics.click()
                         onAction()
                     }
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
     }
@@ -205,11 +197,11 @@ fun BrujulaTagPill(
     val colors = BrujulaDesign.colors
     val haptics = BrujulaDesign.haptics
     val bg by animateColorAsState(
-        targetValue = if (selected) washColor else colors.surfaceSubtle,
+        targetValue = if (selected) washColor else colors.surfaceSubtle.copy(alpha = 0.8f),
         label = "pillBg"
     )
     val border by animateColorAsState(
-        targetValue = if (selected) accentColor.copy(alpha = 0.65f) else colors.borderHairline,
+        targetValue = if (selected) accentColor.copy(alpha = 0.45f) else Color.Transparent,
         label = "pillBorder"
     )
     val fg by animateColorAsState(
@@ -221,10 +213,10 @@ fun BrujulaTagPill(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .defaultMinSize(minHeight = 34.dp)
+            .defaultMinSize(minHeight = 36.dp)
             .clip(shape)
             .background(bg, shape)
-            .border(0.85.dp, border, shape)
+            .border(0.75.dp, border, shape)
             .then(
                 if (onClick != null) {
                     Modifier.clickable {
@@ -235,7 +227,7 @@ fun BrujulaTagPill(
                     Modifier
                 }
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
         if (icon != null) {
             Icon(
@@ -269,7 +261,7 @@ fun BrujulaStatusDot(
     ) {
         Box(
             modifier = Modifier
-                .size(7.5.dp)
+                .size(8.dp)
                 .background(color, CircleShape)
         )
         Spacer(modifier = Modifier.width(7.dp))
@@ -298,12 +290,12 @@ fun BrujulaPrimaryButton(
             onClick()
         },
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(50),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor
         ),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp),
         modifier = modifier.defaultMinSize(minHeight = 48.dp)
     ) {
         if (icon != null) {
@@ -336,12 +328,12 @@ fun BrujulaGhostButton(
             haptics.click()
             onClick()
         },
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(0.9.dp, colors.borderStrong),
+        shape = RoundedCornerShape(50),
+        border = BorderStroke(0.8.dp, colors.borderStrong.copy(alpha = 0.65f)),
         colors = ButtonDefaults.outlinedButtonColors(
             contentColor = accentColor
         ),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         modifier = modifier.defaultMinSize(minHeight = 48.dp)
     ) {
         if (icon != null) {
@@ -362,20 +354,22 @@ fun BrujulaGhostButton(
 }
 
 /**
- * Control deslizante táctil 0–10 de precisión con marcas de escala, respuesta háptica sutil
- * y codificación cromática no estigmatizante.
+ * Control deslizante orgánico y sensorial: muestra palabras cualitativas suaves por defecto
+ * en lugar de cifras frías para reducir el ruido mental en momentos sensibles.
  */
 @Composable
 fun BrujulaPrecisionScale(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     value: Int,
     onValueChange: (Int) -> Unit,
-    minAnchorLabel: String,
-    maxAnchorLabel: String,
+    minAnchorLabel: String = "",
+    maxAnchorLabel: String = "",
     accentColor: Color,
     modifier: Modifier = Modifier,
-    valueRange: IntRange = 0..10
+    valueRange: IntRange = 0..10,
+    showNumericBadge: Boolean = false,
+    qualitativeLabel: ((Int) -> String)? = null
 ) {
     val colors = BrujulaDesign.colors
     val haptics = BrujulaDesign.haptics
@@ -392,17 +386,23 @@ fun BrujulaPrecisionScale(
         label = "scaleFraction"
     )
 
+    val badgeText = when {
+        qualitativeLabel != null -> qualitativeLabel(value)
+        showNumericBadge -> "$value"
+        else -> defaultQualitativeWord(value, valueRange)
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "$title: $value sobre ${valueRange.last}"
+                contentDescription = "$title: $badgeText"
             }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -410,35 +410,30 @@ fun BrujulaPrecisionScale(
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.inkPrimary
                 )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.inkMuted
-                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.inkMuted
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(12.dp))
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = accentColor.copy(alpha = 0.14f),
-                border = BorderStroke(0.8.dp, accentColor.copy(alpha = 0.4f))
-            ) {
-                Text(
-                    text = "$value / ${valueRange.last}",
-                    style = MaterialTheme.typography.labelLarge.merge(TabularNumberStyle),
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
-            }
+            Text(
+                text = badgeText,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = accentColor
+            )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        val stepCount = valueRange.last - valueRange.first
+        val stepCount = (valueRange.last - valueRange.first).coerceAtLeast(1)
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp)
+                .height(40.dp)
                 .pointerInput(valueRange) {
                     detectTapGestures { offset ->
                         val horizontalPad = 14.dp.toPx()
@@ -472,9 +467,8 @@ fun BrujulaPrecisionScale(
             val pad = 14.dp.toPx()
             val trackWidth = (size.width - pad * 2).coerceAtLeast(1f)
             val centerY = size.height / 2f
-            val trackHeight = 6.dp.toPx()
+            val trackHeight = 11.dp.toPx()
 
-            // Base track
             drawRoundRect(
                 color = colors.surfaceSubtle,
                 topLeft = Offset(pad, centerY - trackHeight / 2f),
@@ -482,59 +476,63 @@ fun BrujulaPrecisionScale(
                 cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f)
             )
 
-            // Active fill
-            val activeWidth = trackWidth * animatedFraction
+            val activeWidth = (trackWidth * animatedFraction).coerceAtLeast(trackHeight)
             drawRoundRect(
-                color = accentColor,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(accentColor.copy(alpha = 0.55f), accentColor),
+                    startX = pad,
+                    endX = pad + activeWidth
+                ),
                 topLeft = Offset(pad, centerY - trackHeight / 2f),
-                size = Size(activeWidth.coerceAtLeast(trackHeight), trackHeight),
+                size = Size(activeWidth, trackHeight),
                 cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f)
             )
 
-            // Precision tick marks
-            for (i in 0..stepCount) {
-                val x = pad + (trackWidth / stepCount.toFloat()) * i
-                val isSelectedOrBelow = i <= (value - valueRange.first)
-                drawCircle(
-                    color = if (isSelectedOrBelow) colors.surfaceElevated.copy(alpha = 0.85f) else colors.borderStrong,
-                    radius = if (i % 5 == 0) 2.3.dp.toPx() else 1.5.dp.toPx(),
-                    center = Offset(x, centerY)
-                )
-            }
-
-            // Thumb
-            val thumbX = pad + activeWidth
+            val thumbX = pad + trackWidth * animatedFraction
             drawCircle(
                 color = accentColor.copy(alpha = 0.22f),
-                radius = 14.dp.toPx(),
+                radius = 16.dp.toPx(),
                 center = Offset(thumbX, centerY)
             )
             drawCircle(
                 color = accentColor,
-                radius = 9.dp.toPx(),
+                radius = 10.dp.toPx(),
                 center = Offset(thumbX, centerY)
             )
             drawCircle(
                 color = colors.surfaceElevated,
-                radius = 3.8.dp.toPx(),
+                radius = 4.2.dp.toPx(),
                 center = Offset(thumbX, centerY)
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = minAnchorLabel,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.inkMuted
-            )
-            Text(
-                text = maxAnchorLabel,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.inkMuted
-            )
+        if (minAnchorLabel.isNotBlank() || maxAnchorLabel.isNotBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = minAnchorLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.inkMuted.copy(alpha = 0.8f)
+                )
+                Text(
+                    text = maxAnchorLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.inkMuted.copy(alpha = 0.8f)
+                )
+            }
         }
+    }
+}
+
+private fun defaultQualitativeWord(value: Int, range: IntRange): String {
+    if (range != 0..10) return "$value"
+    return when (value) {
+        0, 1 -> "Muy bajo"
+        2, 3 -> "Suave"
+        4, 5, 6 -> "Medio"
+        7, 8 -> "Alto"
+        else -> "Muy intenso"
     }
 }

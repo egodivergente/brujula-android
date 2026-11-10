@@ -13,7 +13,6 @@ import es.brujula.jitai.core.model.CuratedGuidanceTopic
 import es.brujula.jitai.core.model.DayPlanItem
 import es.brujula.jitai.core.model.DayTimeBlock
 import es.brujula.jitai.core.model.EmaCheckIn
-import es.brujula.jitai.core.model.GhbVoluntaryLog
 import es.brujula.jitai.core.model.JitaiDecisionRecord
 import es.brujula.jitai.core.model.JitaiExperimentalSettings
 import es.brujula.jitai.core.model.MilestoneReflection
@@ -37,7 +36,6 @@ data class BrujulaUiState(
     val checkIns: List<EmaCheckIn> = emptyList(),
     val zones: List<PersonalZone> = emptyList(),
     val dayPlan: List<DayPlanItem> = emptyList(),
-    val ghbLogs: List<GhbVoluntaryLog> = emptyList(),
     val copingSessions: List<CopingSessionLog> = emptyList(),
     val milestones: List<MilestoneReflection> = emptyList(),
     val jitaiDecisions: List<JitaiDecisionRecord> = emptyList(),
@@ -61,7 +59,6 @@ private data class CoreStreamsBundle(
 )
 
 private data class SecondaryStreamsBundle(
-    val ghbLogs: List<GhbVoluntaryLog>,
     val copingSessions: List<CopingSessionLog>,
     val milestones: List<MilestoneReflection>,
     val decisions: List<JitaiDecisionRecord>
@@ -92,12 +89,11 @@ class BrujulaViewModel(
     }
 
     private val secondaryBundleFlow = combine(
-        repository.ghbLogsFlow,
         repository.copingSessionsFlow,
         repository.milestonesFlow,
         repository.jitaiDecisionsFlow
-    ) { ghb, coping, milestones, decisions ->
-        SecondaryStreamsBundle(ghb, coping, milestones, decisions)
+    ) { coping, milestones, decisions ->
+        SecondaryStreamsBundle(coping, milestones, decisions)
     }
 
     val uiState: StateFlow<BrujulaUiState> = combine(
@@ -126,7 +122,6 @@ class BrujulaViewModel(
             checkIns = core.checkIns,
             zones = core.zones,
             dayPlan = core.dayPlan,
-            ghbLogs = secondary.ghbLogs,
             copingSessions = secondary.copingSessions,
             milestones = secondary.milestones,
             jitaiDecisions = secondary.decisions,
@@ -186,7 +181,7 @@ class BrujulaViewModel(
             val decision = repository.submitCheckIn(checkIn)
             ephemeralState.value = ephemeralState.value.copy(
                 reevalMode = false,
-                bannerMessage = decision.headline
+                bannerMessage = null
             )
             onEvaluated(decision)
         }
@@ -196,7 +191,7 @@ class BrujulaViewModel(
         viewModelScope.launch {
             repository.rejectJitaiSuggestionWithFourHourPause(decisionId)
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Avisos automáticos en pausa durante 4 horas. Acceso manual siempre abierto."
+                bannerMessage = "Avisos en silencio durante 4 horas."
             )
         }
     }
@@ -211,7 +206,7 @@ class BrujulaViewModel(
         viewModelScope.launch {
             repository.clearFourHourPause()
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Pausa de 4 horas finalizada manualmente."
+                bannerMessage = "Avisos suaves reactivados."
             )
         }
     }
@@ -222,7 +217,6 @@ class BrujulaViewModel(
         }
     }
 
-    // Zonas
     fun savePersonalZone(
         id: Long = 0L,
         name: String,
@@ -241,7 +235,7 @@ class BrujulaViewModel(
             }
             val zone = PersonalZone(
                 id = id,
-                name = name.trim().ifBlank { "Zona personal" },
+                name = name.trim().ifBlank { "Espacio personal" },
                 category = category,
                 relativeX = relativeX.coerceIn(-0.92f, 0.92f),
                 relativeY = relativeY.coerceIn(-0.92f, 0.92f),
@@ -253,7 +247,7 @@ class BrujulaViewModel(
             )
             repository.saveZone(zone)
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Zona «${zone.name}» guardada en este dispositivo."
+                bannerMessage = "«${zone.name}» guardado."
             )
         }
     }
@@ -268,11 +262,7 @@ class BrujulaViewModel(
         viewModelScope.launch {
             val decision = repository.registerZoneContext(zone)
             ephemeralState.value = ephemeralState.value.copy(
-                gpsMessage = if (zone != null) {
-                    "Contexto activo manual: ${zone.name} (${zone.category.shortBadge})"
-                } else {
-                    "Sin zona contextual seleccionada"
-                },
+                gpsMessage = zone?.let { "En «${it.name}»" },
                 bannerMessage = decision?.headline
             )
         }
@@ -282,31 +272,30 @@ class BrujulaViewModel(
         viewModelScope.launch {
             if (!repository.hasLocationPermission()) {
                 ephemeralState.value = ephemeralState.value.copy(
-                    gpsMessage = "Permiso de ubicación no concedido. Puedes operar 100% en modo manual."
+                    gpsMessage = "Sin permiso GPS · el mapa funciona en modo manual."
                 )
                 return@launch
             }
             val (snapshot, matchedZone) = repository.scanCurrentLocationLocally()
             if (snapshot == null) {
                 ephemeralState.value = ephemeralState.value.copy(
-                    gpsMessage = "Ubicación del sistema no disponible ahora; tus zonas siguen operativas en modo manual."
+                    gpsMessage = "Señal GPS no disponible ahora."
                 )
             } else if (matchedZone != null) {
                 ephemeralState.value = ephemeralState.value.copy(
                     gpsSnapshot = snapshot,
-                    gpsMessage = "Comprobación local (±${snapshot.accuracyMeters.toInt()} m): dentro de «${matchedZone.name}».",
-                    bannerMessage = "Detectada ${matchedZone.category.title.lowercase()} en el dispositivo."
+                    gpsMessage = "Cerca de «${matchedZone.name}».",
+                    bannerMessage = matchedZone.name
                 )
             } else {
                 ephemeralState.value = ephemeralState.value.copy(
                     gpsSnapshot = snapshot,
-                    gpsMessage = "Comprobación local (±${snapshot.accuracyMeters.toInt()} m): fuera de zonas amarillas o rojas configuradas."
+                    gpsMessage = "En zona despejada."
                 )
             }
         }
     }
 
-    // Mi día
     fun savePlanItem(
         id: Long = 0L,
         title: String,
@@ -319,7 +308,7 @@ class BrujulaViewModel(
             repository.saveDayPlanItem(
                 DayPlanItem(
                     id = id,
-                    title = title.trim().ifBlank { "Actividad personal" },
+                    title = title.trim().ifBlank { "Momento propio" },
                     timeBlock = timeBlock,
                     timeLabel = timeLabel.trim().ifBlank { timeBlock.hoursHint },
                     isVulnerableWindow = isVulnerableWindow,
@@ -346,36 +335,16 @@ class BrujulaViewModel(
         viewModelScope.launch {
             val decision = repository.activateVulnerableWindowPrompt(item)
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = decision.headline
+                bannerMessage = decision.explanation
             )
         }
     }
 
-    // Registro voluntario GHB/GBL
-    fun addVoluntaryGhbLog(note: String) {
-        viewModelScope.launch {
-            repository.logVoluntaryGhbEntry(note)
-        }
-    }
-
-    fun removeVoluntaryGhbLog(logId: Long) {
-        viewModelScope.launch {
-            repository.deleteGhbEntry(logId)
-        }
-    }
-
-    fun clearAllVoluntaryGhbLogs() {
-        viewModelScope.launch {
-            repository.clearGhbHistory()
-        }
-    }
-
-    // Práctica de apoyo y guía revisada
     fun logCompletedCopingSession(toolId: String, toolTitle: String, durationSeconds: Int) {
         viewModelScope.launch {
             repository.recordCopingPractice(toolId, toolTitle, durationSeconds)
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Práctica registrada en tu progreso privado: $toolTitle."
+                bannerMessage = "Pausa guardada."
             )
         }
     }
@@ -384,7 +353,6 @@ class BrujulaViewModel(
         return CuratedClinicalContent.queryReviewedGuidance(query)
     }
 
-    // Mi progreso
     fun saveMilestone(
         checkpointWeek: Int,
         daysUsed: Int,
@@ -406,7 +374,7 @@ class BrujulaViewModel(
                 )
             )
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Autoevaluación de Semana $checkpointWeek guardada localmente."
+                bannerMessage = "Reflexión guardada."
             )
         }
     }
@@ -415,12 +383,11 @@ class BrujulaViewModel(
         viewModelScope.launch {
             repository.updatePersonalOrientation(motto, goal, week)
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Rumbo y meta personal actualizados."
+                bannerMessage = "Rumbo actualizado."
             )
         }
     }
 
-    // Configuración, reglas y privacidad
     fun saveExperimentalRules(
         cravingThreshold: Int,
         controlThreshold: Int,
@@ -437,7 +404,7 @@ class BrujulaViewModel(
                 quietEndHour = quietEndHour
             )
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Reglas experimentales actualizadas y versionadas."
+                bannerMessage = "Sensibilidad actualizada."
             )
         }
     }
@@ -470,7 +437,7 @@ class BrujulaViewModel(
         viewModelScope.launch {
             repository.updateNurseProfile(profile)
             ephemeralState.value = ephemeralState.value.copy(
-                bannerMessage = "Contacto de enfermería actualizado."
+                bannerMessage = "Contacto guardado."
             )
         }
     }
@@ -478,11 +445,7 @@ class BrujulaViewModel(
     fun triggerTestNeutralNotification() {
         val sent = repository.sendTestNeutralNotification(uiState.value.settings.discreetModeEnabled)
         ephemeralState.value = ephemeralState.value.copy(
-            bannerMessage = if (sent) {
-                "Notificación neutra enviada para verificar discreción en pantalla."
-            } else {
-                "Concede permiso de notificaciones del sistema para recibir avisos."
-            }
+            bannerMessage = if (sent) "Aviso discreto enviado." else "Activa el permiso de notificaciones."
         )
     }
 
@@ -497,7 +460,7 @@ class BrujulaViewModel(
         viewModelScope.launch {
             repository.wipeAllLocalData()
             ephemeralState.value = EphemeralUiFeedback(
-                bannerMessage = "Todos los registros locales se han eliminado del dispositivo."
+                bannerMessage = "Datos eliminados de este teléfono."
             )
         }
     }

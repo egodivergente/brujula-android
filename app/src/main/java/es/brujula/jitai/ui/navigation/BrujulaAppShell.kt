@@ -28,15 +28,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Air
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.WbTwilight
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -66,6 +66,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import es.brujula.jitai.core.designsystem.BrujulaDesign
+import es.brujula.jitai.core.designsystem.EditorialSerif
 import es.brujula.jitai.ui.BrujulaUiState
 import es.brujula.jitai.ui.BrujulaViewModel
 import es.brujula.jitai.ui.screens.CheckInScreen
@@ -95,16 +96,16 @@ private val PrimaryTabs = listOf(
     PrimaryNavTab(
         routePrefix = "checkin",
         targetRoute = "checkin",
-        label = "Check-in",
+        label = "Sentir",
         discreetLabel = "Pulso",
         icon = Icons.Outlined.Tune
     ),
     PrimaryNavTab(
         routePrefix = "zones",
         targetRoute = "zones",
-        label = "Mis zonas",
+        label = "Zonas",
         discreetLabel = "Mapa",
-        icon = Icons.Outlined.Map
+        icon = Icons.Outlined.Place
     ),
     PrimaryNavTab(
         routePrefix = "myday",
@@ -116,9 +117,9 @@ private val PrimaryTabs = listOf(
     PrimaryNavTab(
         routePrefix = "support",
         targetRoute = "support",
-        label = "Apoyo",
-        discreetLabel = "Recursos",
-        icon = Icons.Outlined.FavoriteBorder
+        label = "Calma",
+        discreetLabel = "Pausa",
+        icon = Icons.Outlined.Air
     )
 )
 
@@ -156,7 +157,7 @@ fun BrujulaAppShell(
         containerColor = colors.canvas,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            BrujulaCompactTopBar(
+            BrujulaMinimalTopBar(
                 state = state,
                 currentRoute = currentRoute,
                 onBrandClick = { navigateTopLevel("home") },
@@ -166,7 +167,7 @@ fun BrujulaAppShell(
             )
         },
         bottomBar = {
-            BrujulaCompactBottomBar(
+            BrujulaFloatingDock(
                 currentRoute = currentRoute,
                 discreetMode = state.settings.discreetModeEnabled,
                 onSelectTab = { tab ->
@@ -192,14 +193,13 @@ fun BrujulaAppShell(
                 val msg = state.statusBannerMessage.orEmpty()
                 Surface(
                     color = colors.jadeWash,
-                    border = BorderStroke(0.8.dp, colors.jadePrimary.copy(alpha = 0.45f)),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(50),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 20.dp, vertical = 4.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -211,13 +211,13 @@ fun BrujulaAppShell(
                         )
                         IconButton(
                             onClick = viewModel::clearBannerMessage,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Close,
-                                contentDescription = "Cerrar aviso",
+                                contentDescription = "Cerrar",
                                 tint = colors.onJadeWash,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         }
                     }
@@ -263,10 +263,7 @@ fun BrujulaAppShell(
                                     goal = state.settings.programGoal,
                                     week = state.settings.currentProgramWeek
                                 )
-                            },
-                            onLogGhb = viewModel::addVoluntaryGhbLog,
-                            onDeleteGhb = viewModel::removeVoluntaryGhbLog,
-                            onClearGhb = viewModel::clearAllVoluntaryGhbLogs
+                            }
                         )
                     }
 
@@ -275,7 +272,7 @@ fun BrujulaAppShell(
                             state = state,
                             onSubmitCheckIn = viewModel::submitEmaCheckIn,
                             onOpenCopingSupport = {
-                                navController.navigate("support?section=coping") {
+                                navController.navigate("support?section=breathing") {
                                     launchSingleTop = true
                                 }
                             },
@@ -333,10 +330,7 @@ fun BrujulaAppShell(
                             state = state,
                             initialSectionKey = sectionKey,
                             onCompletePractice = viewModel::logCompletedCopingSession,
-                            onSaveNurseProfile = viewModel::saveNurseNavigatorProfile,
-                            onLogGhb = viewModel::addVoluntaryGhbLog,
-                            onDeleteGhb = viewModel::removeVoluntaryGhbLog,
-                            onClearGhb = viewModel::clearAllVoluntaryGhbLogs
+                            onSaveNurseProfile = viewModel::saveNurseNavigatorProfile
                         )
                     }
 
@@ -376,7 +370,7 @@ fun BrujulaAppShell(
 }
 
 @Composable
-private fun BrujulaCompactTopBar(
+private fun BrujulaMinimalTopBar(
     state: BrujulaUiState,
     currentRoute: String,
     onBrandClick: () -> Unit,
@@ -390,149 +384,128 @@ private fun BrujulaCompactTopBar(
     val inProgress = currentRoute == "progress"
     val inSettings = currentRoute == "settings"
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.canvas)
             .statusBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .clip(RoundedCornerShape(50))
+                .clickable {
+                    haptics.click()
+                    if (isSecondaryScreen) onBackClick() else onBrandClick()
+                }
+                .padding(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+            if (isSecondaryScreen) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = colors.inkPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else {
+                CompassMarkGlyph(
+                    primaryColor = colors.jadePrimary,
+                    ringColor = colors.borderStrong
+                )
+            }
+            Spacer(modifier = Modifier.width(9.dp))
+            Text(
+                text = if (state.settings.discreetModeEnabled) "Orientación" else "Brújula",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = EditorialSerif,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.3.sp
+                ),
+                color = colors.inkPrimary
+            )
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable {
-                        haptics.click()
-                        if (isSecondaryScreen) onBackClick() else onBrandClick()
-                    }
-                    .padding(horizontal = 4.dp, vertical = 3.dp)
-            ) {
-                if (isSecondaryScreen) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = colors.inkPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else {
-                    CompassMarkGlyph(
-                        primaryColor = colors.jadePrimary,
-                        ringColor = colors.borderStrong
-                    )
+            CircleHeaderAction(
+                icon = Icons.Outlined.Insights,
+                contentDescription = "Mi progreso",
+                selected = inProgress,
+                onClick = {
+                    haptics.click()
+                    onOpenProgress()
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (state.settings.discreetModeEnabled) "ORIENTACIÓN" else "BRÚJULA",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        letterSpacing = 1.6.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = colors.inkPrimary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = colors.surfaceSubtle,
-                    border = BorderStroke(0.7.dp, colors.borderHairline)
-                ) {
-                    Text(
-                        text = "Sem ${state.settings.currentProgramWeek}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.inkSecondary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
+            )
+            CircleHeaderAction(
+                icon = Icons.Outlined.Settings,
+                contentDescription = "Configuración",
+                selected = inSettings,
+                onClick = {
+                    haptics.click()
+                    onOpenSettings()
                 }
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TopActionChip(
-                    icon = Icons.Outlined.Insights,
-                    label = "Progreso",
-                    selected = inProgress,
-                    onClick = {
-                        haptics.click()
-                        onOpenProgress()
-                    }
-                )
-                TopActionChip(
-                    icon = Icons.Outlined.Settings,
-                    label = "Ajustes",
-                    selected = inSettings,
-                    onClick = {
-                        haptics.click()
-                        onOpenSettings()
-                    }
-                )
-            }
+            )
         }
-        HorizontalDivider(thickness = 0.75.dp, color = colors.borderHairline)
     }
 }
 
 @Composable
-private fun TopActionChip(
+private fun CircleHeaderAction(
     icon: ImageVector,
-    label: String,
+    contentDescription: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     val colors = BrujulaDesign.colors
     val bg = if (selected) colors.jadeWash else colors.surfaceElevated
-    val border = if (selected) colors.jadePrimary.copy(alpha = 0.65f) else colors.borderHairline
     val fg = if (selected) colors.jadePrimary else colors.inkSecondary
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(bg, RoundedCornerShape(50))
-            .border(0.8.dp, border, RoundedCornerShape(50))
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(bg, CircleShape)
+            .border(
+                0.6.dp,
+                if (selected) colors.jadePrimary.copy(alpha = 0.5f) else colors.borderHairline.copy(alpha = 0.6f),
+                CircleShape
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = label,
+            contentDescription = contentDescription,
             tint = fg,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(5.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = fg
+            modifier = Modifier.size(18.dp)
         )
     }
 }
 
 @Composable
 private fun CompassMarkGlyph(
-    primaryColor: androidx.compose.ui.graphics.Color,
-    ringColor: androidx.compose.ui.graphics.Color
+    primaryColor: Color,
+    ringColor: Color
 ) {
     Canvas(modifier = Modifier.size(22.dp)) {
         val c = Offset(size.width / 2f, size.height / 2f)
         val r = size.minDimension / 2f - 1.dp.toPx()
         drawCircle(
-            color = ringColor,
+            color = ringColor.copy(alpha = 0.7f),
             radius = r,
             center = c,
-            style = Stroke(width = 1.2.dp.toPx())
+            style = Stroke(width = 1.dp.toPx())
         )
         val needle = Path().apply {
             moveTo(c.x, c.y - r * 0.72f)
-            lineTo(c.x + r * 0.24f, c.y)
+            lineTo(c.x + r * 0.22f, c.y)
             lineTo(c.x, c.y + r * 0.72f)
-            lineTo(c.x - r * 0.24f, c.y)
+            lineTo(c.x - r * 0.22f, c.y)
             close()
         }
         drawPath(path = needle, color = primaryColor)
@@ -540,64 +513,74 @@ private fun CompassMarkGlyph(
 }
 
 @Composable
-private fun BrujulaCompactBottomBar(
+private fun BrujulaFloatingDock(
     currentRoute: String,
     discreetMode: Boolean,
     onSelectTab: (PrimaryNavTab) -> Unit
 ) {
     val colors = BrujulaDesign.colors
-    Column(
+    val dockShape = RoundedCornerShape(28.dp)
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.surfaceElevated)
+            .background(Color.Transparent)
             .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        HorizontalDivider(thickness = 0.8.dp, color = colors.borderHairline)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            shape = dockShape,
+            color = colors.surfaceElevated,
+            border = BorderStroke(0.7.dp, colors.borderHairline.copy(alpha = 0.7f)),
+            shadowElevation = if (colors.isDark) 10.dp else 4.dp,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            PrimaryTabs.forEach { tab ->
-                val isSelected = currentRoute.startsWith(tab.routePrefix)
-                val fg = if (isSelected) colors.jadePrimary else colors.inkMuted
-                val pillBg = if (isSelected) colors.jadeWash else androidx.compose.ui.graphics.Color.Transparent
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PrimaryTabs.forEach { tab ->
+                    val isSelected = currentRoute.startsWith(tab.routePrefix)
+                    val fg = if (isSelected) colors.jadePrimary else colors.inkMuted
+                    val pillBg = if (isSelected) colors.jadeWash else Color.Transparent
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onSelectTab(tab) }
-                        .padding(vertical = 4.dp)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .height(28.dp)
-                            .width(48.dp)
-                            .background(pillBg, CircleShape)
+                            .weight(1f)
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable { onSelectTab(tab) }
+                            .padding(vertical = 3.dp)
                     ) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            tint = fg,
-                            modifier = Modifier.size(20.dp)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .height(30.dp)
+                                .width(48.dp)
+                                .background(pillBg, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = fg,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (discreetMode) tab.discreetLabel else tab.label,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                letterSpacing = 0.2.sp
+                            ),
+                            color = fg,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (discreetMode) tab.discreetLabel else tab.label,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            letterSpacing = 0.1.sp
-                        ),
-                        color = fg,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         }

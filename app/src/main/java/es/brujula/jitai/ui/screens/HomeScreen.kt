@@ -3,6 +3,14 @@ package es.brujula.jitai.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,27 +26,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Air
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.CompassCalibration
-import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Emergency
-import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.MedicalServices
-import androidx.compose.material.icons.outlined.PauseCircleOutline
-import androidx.compose.material.icons.outlined.PsychologyAlt
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,633 +50,325 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.brujula.jitai.core.designsystem.BrujulaDesign
 import es.brujula.jitai.core.designsystem.BrujulaGhostButton
 import es.brujula.jitai.core.designsystem.BrujulaPrimaryButton
-import es.brujula.jitai.core.designsystem.BrujulaSectionTitle
 import es.brujula.jitai.core.designsystem.BrujulaSurface
-import es.brujula.jitai.core.designsystem.BrujulaTagPill
-import es.brujula.jitai.core.designsystem.TabularNumberStyle
+import es.brujula.jitai.core.designsystem.EditorialSerif
+import es.brujula.jitai.core.model.CompassBearingState
+import es.brujula.jitai.core.model.DayPlanItem
 import es.brujula.jitai.core.model.JitaiActionKind
+import es.brujula.jitai.core.model.JitaiDecisionRecord
 import es.brujula.jitai.core.model.ZoneCategory
 import es.brujula.jitai.ui.BrujulaUiState
-import es.brujula.jitai.ui.components.GhbVoluntaryTrackerCard
 import es.brujula.jitai.ui.components.LivingCompassCanvas
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun HomeScreen(
     state: BrujulaUiState,
-    onNavigateToCheckIn: (reeval: Boolean) -> Unit,
+    onNavigateToCheckIn: (reevaluation: Boolean) -> Unit,
     onNavigateToZones: () -> Unit,
     onNavigateToMyDay: () -> Unit,
-    onNavigateToSupport: (initialSection: String?) -> Unit,
+    onNavigateToSupport: (section: String?) -> Unit,
     onNavigateToProgress: () -> Unit,
-    onTogglePlanCompleted: (es.brujula.jitai.core.model.DayPlanItem) -> Unit,
+    onTogglePlanCompleted: (DayPlanItem) -> Unit,
     onRejectSuggestion4h: (Long) -> Unit,
     onAcceptSuggestion: (Long) -> Unit,
     onResumeNotifications: () -> Unit,
     onDismissReeval: () -> Unit,
-    onUpdateMotto: (String) -> Unit,
-    onLogGhb: (String) -> Unit,
-    onDeleteGhb: (Long) -> Unit,
-    onClearGhb: () -> Unit
+    onUpdateMotto: (String) -> Unit
 ) {
     val colors = BrujulaDesign.colors
+    val haptics = BrujulaDesign.haptics
     val context = LocalContext.current
     val now = System.currentTimeMillis()
 
-    var showMottoDialog by remember { mutableStateOf(false) }
-    var draftMotto by remember(state.settings.personalMotto) {
+    var showMottoEditor by rememberSaveable { mutableStateOf(false) }
+    var draftMotto by rememberSaveable(state.settings.personalMotto) {
         mutableStateOf(state.settings.personalMotto)
     }
-    var showRuleExplanation by remember { mutableStateOf(false) }
 
-    val latestCheckIn = state.checkIns.firstOrNull()
-    val latestDecision = state.jitaiDecisions.firstOrNull()
+    val latestPendingDecision = state.jitaiDecisions.firstOrNull {
+        it.userResponse == "PENDIENTE" &&
+            it.actionKind != JitaiActionKind.NONE &&
+            it.actionKind != JitaiActionKind.SUPPRESSED_BY_RULE
+    }
+    val isPaused4h = state.settings.pausedUntilMillis > now
+    val reevalActive = state.settings.reevalDueAtMillis in 1..now
     val nextPlanned = state.dayPlan.firstOrNull { !it.completed }
-    val isPaused4h = now < state.settings.pausedUntilMillis
-    val reevalActive = state.settings.reevalDueAtMillis > 0L
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Cabecera Protagonista: La Brújula Viva
-        item {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(colors.surfaceHero)
-                    .border(0.9.dp, Color(0xFF284D5F), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 18.dp, vertical = 18.dp)
+        // 1. Escenario atmosférico protagonista: Brújula viva y lectura serena sin cifras
+        SanctuaryCompassStage(
+            state = state,
+            onNavigateToCheckIn = { onNavigateToCheckIn(false) },
+            onNavigateToBreathing = { onNavigateToSupport("breathing") },
+            onEditMotto = {
+                draftMotto = state.settings.personalMotto
+                showMottoEditor = true
+            },
+            onOpenZones = onNavigateToZones
+        )
+
+        // 2. Susurro contextual JITAI (solo si hay una invitación activa o pausa)
+        if (reevalActive) {
+            BrujulaSurface(
+                containerColor = colors.jadeWash.copy(alpha = 0.75f),
+                borderColor = colors.jadePrimary.copy(alpha = 0.30f),
+                contentPadding = PaddingValues(18.dp)
             ) {
+                Text(
+                    text = "Han pasado unos minutos",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onJadeWash
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "¿Cómo se siente el cuerpo ahora?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkSecondary
+                )
+                Spacer(modifier = Modifier.height(14.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .background(Color(0xFF48C4AC), CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(7.dp))
-                        Text(
-                            text = "SEMANA ${state.settings.currentProgramWeek} DE 12",
-                            style = MaterialTheme.typography.labelSmall.merge(TabularNumberStyle),
-                            color = Color(0xFF9EC7D4)
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (state.settings.discreetModeEnabled) {
-                            Icon(
-                                imageVector = Icons.Outlined.VisibilityOff,
-                                contentDescription = "Modo discreto activo",
-                                tint = Color(0xFF9EC7D4),
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                        val zoneBadgeText = state.activeZone?.let {
-                            "Zona ${it.category.shortBadge.lowercase()}"
-                        } ?: if (state.settings.optionalGpsEnabled) "GPS local" else "Modo sin GPS"
-                        Text(
-                            text = zoneBadgeText,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFFD6E5EA),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(Color(0xFF183847))
-                                .clickable { onNavigateToZones() }
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                    BrujulaPrimaryButton(
+                        text = "Volver a sentir",
+                        onClick = { onNavigateToCheckIn(true) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onDismissReeval) {
+                        Text("Ahora no", color = colors.inkMuted)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                LivingCompassCanvas(
-                    bearingState = state.compassBearing,
-                    diameter = 196.dp,
-                    onCompassTapped = { onNavigateToCheckIn(false) }
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
+            }
+        } else if (latestPendingDecision != null) {
+            MinimalJitaiWhisperCard(
+                decision = latestPendingDecision,
+                onPrimaryAction = {
+                    onAcceptSuggestion(latestPendingDecision.id)
+                    when (latestPendingDecision.actionKind) {
+                        JitaiActionKind.CHOOSE_COPING_OR_HUMAN -> onNavigateToSupport("breathing")
+                        JitaiActionKind.OFFER_PLANNED_ALTERNATIVE -> onNavigateToMyDay()
+                        JitaiActionKind.INVITE_NEUTRAL_CHECKIN -> onNavigateToCheckIn(false)
+                        JitaiActionKind.INVITE_CRAVING_REEVALUATION -> onNavigateToCheckIn(true)
+                        else -> onNavigateToSupport(null)
+                    }
+                },
+                onSecondaryNurseAction = if (latestPendingDecision.actionKind == JitaiActionKind.CHOOSE_COPING_OR_HUMAN) {
+                    {
+                        onAcceptSuggestion(latestPendingDecision.id)
+                        onNavigateToSupport("nurse")
+                    }
+                } else {
+                    null
+                },
+                onReject4h = { onRejectSuggestion4h(latestPendingDecision.id) }
+            )
+        } else if (isPaused4h) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(50))
+                    .background(colors.surfaceElevated)
+                    .border(0.6.dp, colors.borderHairline.copy(alpha = 0.55f), RoundedCornerShape(50))
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = state.compassBearing.shortTitle,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = colors.onSurfaceHero,
-                    textAlign = TextAlign.Center
+                    text = "Avisos en silencio temporal",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.inkMuted
                 )
-                Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = state.compassBearing.poeticReading,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFFC4D6DD),
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0xFF234454))
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Lema de orientación autónoma editable
-                Row(
+                    text = "Reactivar",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.jadePrimary,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { showMottoDialog = true }
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                        .clip(RoundedCornerShape(50))
+                        .clickable {
+                            haptics.click()
+                            onResumeNotifications()
+                        }
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+        }
+
+        // 3. Dos tarjetas visuales orgánicas (Cero métricas, pura calma visual)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            VisualSanctuaryCard(
+                title = "Calma",
+                subtitle = "Aliento guiado",
+                accentColor = colors.jadePrimary,
+                artworkKind = SanctuaryArtworkKind.WAVES,
+                onClick = { onNavigateToSupport("breathing") },
+                modifier = Modifier.weight(1f)
+            )
+            VisualSanctuaryCard(
+                title = "Espacios",
+                subtitle = state.activeZone?.name ?: "Mapa sereno",
+                accentColor = when (state.activeZone?.category) {
+                    ZoneCategory.YELLOW -> colors.zoneAmber
+                    ZoneCategory.RED -> colors.zoneCoral
+                    else -> colors.petroleumAccent
+                },
+                artworkKind = SanctuaryArtworkKind.CONSTELLATION,
+                onClick = onNavigateToZones,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // 4. Siguiente ancla suave del día (sin listas abrumadoras)
+        BrujulaSurface(
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            onClick = onNavigateToMyDay
+        ) {
+            if (nextPlanned != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "NORTE PERSONAL",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF7FA6B5)
-                        )
-                        Text(
-                            text = "«${state.settings.personalMotto}»",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFEDE7DA)
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Outlined.Edit,
-                        contentDescription = "Editar norte personal",
-                        tint = Color(0xFF8FB4C2),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Resumen del último estado reportado + botón rápido de Check-in
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (latestCheckIn != null) {
-                        val stamp = Instant.ofEpochMilli(latestCheckIn.timestampMillis)
-                            .atZone(ZoneId.systemDefault())
-                            .format(DateTimeFormatter.ofPattern("HH:mm"))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Último check-in ($stamp)",
-                                style = MaterialTheme.typography.bodySmall.merge(TabularNumberStyle),
-                                color = Color(0xFF92B3C0)
-                            )
-                            Text(
-                                text = "Ánimo ${latestCheckIn.mood} · Control ${latestCheckIn.perceivedControl} · Craving ${latestCheckIn.craving}",
-                                style = MaterialTheme.typography.labelLarge.merge(TabularNumberStyle),
-                                color = Color(0xFFF3EEE5)
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = "Registra cómo te encuentras en 20 s",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFB5CAD2),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    BrujulaPrimaryButton(
-                        text = "Check-in EMA",
-                        icon = Icons.Outlined.CompassCalibration,
-                        containerColor = Color(0xFF33AE96),
-                        contentColor = Color(0xFF06251F),
-                        onClick = { onNavigateToCheckIn(false) }
-                    )
-                }
-            }
-        }
-
-        // 2. Estado de Pausa de 4 h o Reevaluación voluntaria a los 20 min
-        if (isPaused4h) {
-            item {
-                val minsLeft = ((state.settings.pausedUntilMillis - now) / 60_000L).coerceAtLeast(1L)
-                BrujulaSurface(
-                    containerColor = colors.surfaceSubtle,
-                    borderColor = colors.borderStrong
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.PauseCircleOutline,
-                                contentDescription = null,
-                                tint = colors.inkSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "Pausa de 4 h activa (${minsLeft / 60}h ${"%02d".format(minsLeft % 60)}m restantes)",
-                                    style = MaterialTheme.typography.titleSmall.merge(TabularNumberStyle),
-                                    color = colors.inkPrimary
-                                )
-                                Text(
-                                    text = "No recibirás avisos automáticos; todas las herramientas siguen abiertas manualmente.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = colors.inkSecondary
-                                )
-                            }
-                        }
-                        TextButton(onClick = onResumeNotifications) {
-                            Text("Reanudar")
-                        }
-                    }
-                }
-            }
-        }
-
-        if (reevalActive) {
-            item {
-                val remainingMillis = state.settings.reevalDueAtMillis - now
-                val isReady = remainingMillis <= 0L
-                val mins = (remainingMillis.coerceAtLeast(0L) / 60_000L)
-                BrujulaSurface(
-                    containerColor = colors.jadeWash,
-                    borderColor = colors.jadePrimary.copy(alpha = 0.5f)
-                ) {
-                    Text(
-                        text = if (isReady) {
-                            "REEVALUACIÓN VOLUNTARIA DISPONIBLE"
-                        } else {
-                            "REEVALUACIÓN VOLUNTARIA EN ~${mins + 1} MIN"
-                        },
-                        style = MaterialTheme.typography.labelSmall.merge(TabularNumberStyle),
-                        color = colors.onJadeWash
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "¿Cómo evoluciona la ola de craving tras unos minutos?",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.inkPrimary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        BrujulaPrimaryButton(
-                            text = "Reevaluar ahora",
-                            onClick = { onNavigateToCheckIn(true) }
-                        )
-                        BrujulaGhostButton(
-                            text = "Omitir sin alerta",
-                            onClick = onDismissReeval
-                        )
-                    }
-                }
-            }
-        }
-
-        // 3. Tarjeta JITAI explicable cuando hay una sugerencia activa pendiente
-        if (latestDecision != null &&
-            latestDecision.actionKind != JitaiActionKind.NONE &&
-            latestDecision.userResponse == "PENDIENTE"
-        ) {
-            item {
-                val isIntense = latestDecision.actionKind == JitaiActionKind.CHOOSE_COPING_OR_HUMAN
-                BrujulaSurface(
-                    containerColor = if (isIntense) colors.coralWash else colors.amberWash,
-                    borderColor = if (isIntense) colors.coralAccent.copy(alpha = 0.55f) else colors.amberAccent.copy(alpha = 0.55f)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "ORIENTACIÓN ADAPTATIVA · ${latestDecision.triggerSource.label.uppercase()}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isIntense) colors.onCoralWash else colors.onAmberWash
-                        )
-                        Text(
-                            text = if (showRuleExplanation) "Ocultar regla" else "¿Por qué?",
+                            text = "Próxima ancla · ${nextPlanned.timeLabel}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (isIntense) colors.onCoralWash else colors.onAmberWash,
-                            modifier = Modifier.clickable { showRuleExplanation = !showRuleExplanation }
+                            color = if (nextPlanned.isVulnerableWindow) colors.amberAccent else colors.jadePrimary
                         )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = latestDecision.headline,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = colors.inkPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = latestDecision.explanation,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.inkSecondary
-                    )
-
-                    AnimatedVisibility(visible = showRuleExplanation) {
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = "${latestDecision.ruleTrace} (Umbral experimental no clínico).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.inkMuted,
-                            modifier = Modifier.padding(top = 8.dp)
+                            text = nextPlanned.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.inkPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        when (latestDecision.actionKind) {
-                            JitaiActionKind.CHOOSE_COPING_OR_HUMAN -> {
-                                BrujulaPrimaryButton(
-                                    text = "Afrontamiento (3 min)",
-                                    onClick = {
-                                        onAcceptSuggestion(latestDecision.id)
-                                        onNavigateToSupport("coping")
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BrujulaGhostButton(
-                                    text = "Enfermería",
-                                    onClick = {
-                                        onAcceptSuggestion(latestDecision.id)
-                                        onNavigateToSupport("nurse")
-                                    }
-                                )
-                            }
-                            JitaiActionKind.INVITE_NEUTRAL_CHECKIN -> {
-                                BrujulaPrimaryButton(
-                                    text = "Hacer check-in",
-                                    onClick = {
-                                        onAcceptSuggestion(latestDecision.id)
-                                        onNavigateToCheckIn(false)
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            else -> {
-                                BrujulaPrimaryButton(
-                                    text = "Ver apoyo",
-                                    onClick = {
-                                        onAcceptSuggestion(latestDecision.id)
-                                        onNavigateToSupport(null)
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                        TextButton(
-                            onClick = { onRejectSuggestion4h(latestDecision.id) }
-                        ) {
+                        if (nextPlanned.chosenAlternative.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Pausar 4 h",
-                                color = colors.inkSecondary
+                                text = nextPlanned.chosenAlternative,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.inkMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
-                }
-            }
-        }
-
-        // 4. Acceso inmediato al apoyo (permanente, 1 toque)
-        item {
-            BrujulaSectionTitle(
-                title = "Apoyo inmediato",
-                meta = "Siempre abierto manualmente",
-                actionLabel = "Todo el apoyo",
-                onAction = { onNavigateToSupport(null) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
-            ) {
-                QuickSupportTile(
-                    icon = Icons.Outlined.Air,
-                    title = "Respirar",
-                    subtitle = "Pausa 4·2·6",
-                    accent = colors.jadePrimary,
-                    wash = colors.jadeWash,
-                    onClick = { onNavigateToSupport("breathing") },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickSupportTile(
-                    icon = Icons.Outlined.PsychologyAlt,
-                    title = "Guía IA",
-                    subtitle = "Revisada",
-                    accent = colors.petroleumAccent,
-                    wash = colors.surfaceSubtle,
-                    onClick = { onNavigateToSupport("guide") },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickSupportTile(
-                    icon = Icons.Outlined.MedicalServices,
-                    title = "Enfermera",
-                    subtitle = "9–17 h",
-                    accent = colors.amberAccent,
-                    wash = colors.amberWash,
-                    onClick = { onNavigateToSupport("nurse") },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickSupportTile(
-                    icon = Icons.Outlined.Emergency,
-                    title = "112",
-                    subtitle = "Urgencia",
-                    accent = colors.coralAccent,
-                    wash = colors.coralWash,
-                    onClick = {
-                        val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
-                        context.startActivity(dialIntent)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // 5. Siguiente actividad planificada / ventana vulnerable de Mi día
-        item {
-            BrujulaSectionTitle(
-                title = "Siguiente paso en tu día",
-                actionLabel = "Planificar Mi día",
-                onAction = onNavigateToMyDay
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            if (nextPlanned != null) {
-                BrujulaSurface(onClick = onNavigateToMyDay) {
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(colors.jadeWash, CircleShape)
+                            .clickable {
+                                haptics.confirm()
+                                onTogglePlanCompleted(nextPlanned)
+                            }
                     ) {
-                        IconButton(
-                            onClick = { onTogglePlanCompleted(nextPlanned) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (nextPlanned.completed) {
-                                    Icons.Outlined.CheckCircle
-                                } else {
-                                    Icons.Outlined.RadioButtonUnchecked
-                                },
-                                contentDescription = "Marcar completada",
-                                tint = colors.jadePrimary
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${nextPlanned.timeBlock.label} · ${nextPlanned.timeLabel}",
-                                    style = MaterialTheme.typography.labelMedium.merge(TabularNumberStyle),
-                                    color = if (nextPlanned.isVulnerableWindow) colors.amberAccent else colors.jadePrimary
-                                )
-                                if (nextPlanned.isVulnerableWindow) {
-                                    BrujulaTagPill(
-                                        label = "Franja sensible",
-                                        selected = true,
-                                        accentColor = colors.amberAccent,
-                                        washColor = colors.amberWash
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(3.dp))
-                            Text(
-                                text = nextPlanned.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = colors.inkPrimary
-                            )
-                            if (nextPlanned.chosenAlternative.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Alternativa propia: ${nextPlanned.chosenAlternative}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = colors.inkSecondary
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Outlined.Check,
+                            contentDescription = "Completar paso",
+                            tint = colors.jadePrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             } else {
-                BrujulaSurface(onClick = onNavigateToMyDay) {
-                    Text(
-                        text = "Has completado tus actividades previstas de hoy. Toca para añadir un descanso o alternativa.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.inkSecondary
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Mi día está despejado",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.inkPrimary
+                        )
+                        Text(
+                            text = "Toca para elegir un pequeño gesto de cuidado",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.inkMuted
+                        )
+                    }
                 }
             }
         }
 
-        // 6. Registro voluntario de GHB/GBL (cronómetro transcurrido sin recomendar intervalos seguros)
-        item {
-            GhbVoluntaryTrackerCard(
-                logs = state.ghbLogs,
-                discreetMode = state.settings.discreetModeEnabled,
-                onLogNewEntry = onLogGhb,
-                onDeleteEntry = onDeleteGhb,
-                onClearAll = onClearGhb
+        // 5. Acceso humano discreto y siempre a mano
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DiscreetFooterPill(
+                icon = Icons.Outlined.SupportAgent,
+                label = "Enfermería",
+                tint = colors.inkSecondary,
+                onClick = { onNavigateToSupport("nurse") }
+            )
+            DiscreetFooterPill(
+                icon = Icons.Outlined.Emergency,
+                label = "Urgencias 112",
+                tint = colors.coralAccent,
+                onClick = {
+                    haptics.gentlePulse()
+                    context.startActivity(
+                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
+                    )
+                }
             )
         }
 
-        // 7. Tarjeta compacta de conexión con Zonas y Mi Progreso
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                BrujulaSurface(
-                    onClick = onNavigateToZones,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(14.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.LocationOn,
-                        contentDescription = null,
-                        tint = colors.jadePrimary,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Mis zonas",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = colors.inkPrimary
-                    )
-                    val greenCount = state.zones.count { it.category == ZoneCategory.GREEN }
-                    Text(
-                        text = "${state.zones.size} activas ($greenCount verdes)",
-                        style = MaterialTheme.typography.bodySmall.merge(TabularNumberStyle),
-                        color = colors.inkMuted
-                    )
-                }
-
-                BrujulaSurface(
-                    onClick = onNavigateToProgress,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(14.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Insights,
-                        contentDescription = null,
-                        tint = colors.petroleumAccent,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Mi progreso",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = colors.inkPrimary
-                    )
-                    val unlocked = state.privateBadges.count { it.unlocked }
-                    Text(
-                        text = "${state.adherenceLast7DaysPercent}% 7d · $unlocked hitos",
-                        style = MaterialTheme.typography.bodySmall.merge(TabularNumberStyle),
-                        color = colors.inkMuted
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
+        Spacer(modifier = Modifier.height(12.dp))
     }
 
-    if (showMottoDialog) {
+    if (showMottoEditor) {
         AlertDialog(
-            onDismissRequest = { showMottoDialog = false },
-            title = { Text("Tu frase de orientación") },
+            onDismissRequest = { showMottoEditor = false },
+            title = {
+                Text(
+                    text = "Tu frase de calma",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            },
             text = {
                 OutlinedTextField(
                     value = draftMotto,
                     onValueChange = { draftMotto = it },
-                    label = { Text("Frase personal") },
+                    label = { Text("Qué te ayuda recordar") },
+                    singleLine = false,
+                    maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -680,14 +376,14 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         onUpdateMotto(draftMotto)
-                        showMottoDialog = false
+                        showMottoEditor = false
                     }
                 ) {
                     Text("Guardar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showMottoDialog = false }) {
+                TextButton(onClick = { showMottoEditor = false }) {
                     Text("Cancelar")
                 }
             }
@@ -696,56 +392,436 @@ fun HomeScreen(
 }
 
 @Composable
-private fun QuickSupportTile(
-    icon: ImageVector,
+private fun SanctuaryCompassStage(
+    state: BrujulaUiState,
+    onNavigateToCheckIn: () -> Unit,
+    onNavigateToBreathing: () -> Unit,
+    onEditMotto: () -> Unit,
+    onOpenZones: () -> Unit
+) {
+    val haptics = BrujulaDesign.haptics
+    val stageShape = RoundedCornerShape(30.dp)
+
+    val ambientGlowColor = when (state.compassBearing) {
+        CompassBearingState.SERENE_HORIZON -> Color(0xFF2EA992)
+        CompassBearingState.VITAL_AUTONOMY -> Color(0xFF56D8C0)
+        CompassBearingState.ATTENTIVE_BREEZE -> Color(0xFFE0973B)
+        CompassBearingState.INTENSE_SWELL -> Color(0xFFDF6C55)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(stageShape)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0E2530),
+                        Color(0xFF0A1B24),
+                        Color(0xFF08151C)
+                    )
+                ),
+                shape = stageShape
+            )
+            .border(
+                width = 0.8.dp,
+                color = Color(0xFFF4EFE6).copy(alpha = 0.12f),
+                shape = stageShape
+            )
+    ) {
+        // Luz atmosférica radial de fondo
+        Canvas(modifier = Modifier.matchParentSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        ambientGlowColor.copy(alpha = 0.20f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width / 2f, size.height * 0.36f),
+                    radius = size.minDimension * 0.72f
+                ),
+                radius = size.minDimension * 0.72f,
+                center = Offset(size.width / 2f, size.height * 0.36f)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            val activeZone = state.activeZone
+            if (activeZone != null) {
+                val dotColor = when (activeZone.category) {
+                    ZoneCategory.GREEN -> Color(0xFF57D5BC)
+                    ZoneCategory.YELLOW -> Color(0xFFF2B35A)
+                    ZoneCategory.RED -> Color(0xFFEF8771)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White.copy(alpha = 0.07f))
+                        .clickable {
+                            haptics.click()
+                            onOpenZones()
+                        }
+                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(dotColor, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text(
+                        text = activeZone.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFEAE3D5)
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            LivingCompassCanvas(
+                bearingState = state.compassBearing,
+                diameter = 252.dp,
+                onCompassTapped = onNavigateToCheckIn
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = state.compassBearing.shortTitle,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontFamily = EditorialSerif,
+                    fontWeight = FontWeight.Normal
+                ),
+                color = Color(0xFFF6F2EA),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = state.compassBearing.poeticReading,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFC7D6DE),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 10.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "«${state.settings.personalMotto}»",
+                style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                color = Color(0xFF8EB0BE),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable {
+                        haptics.click()
+                        onEditMotto()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = {
+                        haptics.confirm()
+                        onNavigateToCheckIn()
+                    },
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF38B89F),
+                        contentColor = Color(0xFF06261F)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text(
+                        text = "Sentir ahora",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        haptics.click()
+                        onNavigateToBreathing()
+                    },
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(0.8.dp, Color(0xFFF6F2EA).copy(alpha = 0.24f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFF6F2EA)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Air,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text(
+                        text = "Respirar",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class SanctuaryArtworkKind {
+    WAVES,
+    CONSTELLATION
+}
+
+@Composable
+private fun VisualSanctuaryCard(
     title: String,
     subtitle: String,
-    accent: Color,
-    wash: Color,
+    accentColor: Color,
+    artworkKind: SanctuaryArtworkKind,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = BrujulaDesign.colors
-    val haptics = BrujulaDesign.haptics
-    Column(
-        horizontalAlignment = Alignment.Start,
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.surfaceElevated)
-            .border(0.85.dp, colors.borderHairline, RoundedCornerShape(14.dp))
-            .clickable {
-                haptics.click()
-                onClick()
-            }
-            .padding(horizontal = 10.dp, vertical = 11.dp)
+    val infiniteTransition = rememberInfiniteTransition(label = "miniArtwork")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "miniPulse"
+    )
+
+    BrujulaSurface(
+        modifier = modifier,
+        contentPadding = PaddingValues(18.dp),
+        onClick = onClick
     ) {
         Box(
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.CenterStart,
             modifier = Modifier
-                .size(30.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(wash)
+                .fillMaxWidth()
+                .height(64.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(17.dp)
-            )
+            Canvas(modifier = Modifier.size(58.dp)) {
+                val c = Offset(size.width / 2f, size.height / 2f)
+                val maxR = size.minDimension / 2f
+                when (artworkKind) {
+                    SanctuaryArtworkKind.WAVES -> {
+                        drawCircle(
+                            color = accentColor.copy(alpha = 0.12f),
+                            radius = maxR * pulse,
+                            center = c
+                        )
+                        drawCircle(
+                            color = accentColor.copy(alpha = 0.30f),
+                            radius = maxR * 0.68f * pulse,
+                            center = c,
+                            style = Stroke(width = 1.2.dp.toPx())
+                        )
+                        drawCircle(
+                            color = accentColor,
+                            radius = maxR * 0.28f,
+                            center = c
+                        )
+                    }
+
+                    SanctuaryArtworkKind.CONSTELLATION -> {
+                        drawCircle(
+                            color = accentColor.copy(alpha = 0.10f),
+                            radius = maxR * 0.96f,
+                            center = c
+                        )
+                        drawCircle(
+                            color = colors.borderStrong.copy(alpha = 0.45f),
+                            radius = maxR * 0.72f,
+                            center = c,
+                            style = Stroke(width = 0.9.dp.toPx())
+                        )
+                        drawCircle(
+                            color = accentColor,
+                            radius = 5.dp.toPx(),
+                            center = Offset(c.x + maxR * 0.26f, c.y - maxR * 0.20f)
+                        )
+                        drawCircle(
+                            color = colors.jadePrimary.copy(alpha = 0.75f),
+                            radius = 3.6.dp.toPx(),
+                            center = Offset(c.x - maxR * 0.30f, c.y + maxR * 0.22f)
+                        )
+                    }
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+
+        Spacer(modifier = Modifier.height(6.dp))
+
         Text(
             text = title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.inkPrimary,
-            maxLines = 1
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.inkPrimary
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodySmall,
             color = colors.inkMuted,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun MinimalJitaiWhisperCard(
+    decision: JitaiDecisionRecord,
+    onPrimaryAction: () -> Unit,
+    onSecondaryNurseAction: (() -> Unit)?,
+    onReject4h: () -> Unit
+) {
+    val colors = BrujulaDesign.colors
+    var showTrace by rememberSaveable(decision.id) { mutableStateOf(false) }
+
+    val primaryLabel = when (decision.actionKind) {
+        JitaiActionKind.CHOOSE_COPING_OR_HUMAN -> "Respirar 3 min"
+        JitaiActionKind.OFFER_PLANNED_ALTERNATIVE -> "Ver mi plan"
+        JitaiActionKind.INVITE_NEUTRAL_CHECKIN -> "Sentir ahora"
+        JitaiActionKind.INVITE_CRAVING_REEVALUATION -> "Volver a sentir"
+        else -> "Abrir calma"
+    }
+
+    BrujulaSurface(
+        containerColor = colors.surfaceElevated,
+        borderColor = colors.amberAccent.copy(alpha = 0.35f),
+        contentPadding = PaddingValues(18.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = decision.headline,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.inkPrimary,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = "Por qué aparece esto",
+                tint = colors.inkMuted.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .clickable { showTrace = !showTrace }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = decision.explanation,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.inkSecondary
+        )
+
+        AnimatedVisibility(visible = showTrace) {
+            Text(
+                text = decision.ruleTrace,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.inkMuted,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BrujulaPrimaryButton(
+                text = primaryLabel,
+                onClick = onPrimaryAction,
+                modifier = Modifier.weight(1f)
+            )
+            if (onSecondaryNurseAction != null) {
+                BrujulaGhostButton(
+                    text = "Enfermería",
+                    onClick = onSecondaryNurseAction,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = "Ahora no · pausar avisos 4 h",
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.inkMuted,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .clip(RoundedCornerShape(50))
+                .clickable(onClick = onReject4h)
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun DiscreetFooterPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    val colors = BrujulaDesign.colors
+    val haptics = BrujulaDesign.haptics
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(colors.surfaceElevated)
+            .border(0.6.dp, colors.borderHairline.copy(alpha = 0.6f), RoundedCornerShape(50))
+            .clickable {
+                haptics.click()
+                onClick()
+            }
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = tint
         )
     }
 }

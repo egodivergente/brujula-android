@@ -3,16 +3,21 @@ package es.brujula.jitai.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,23 +27,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Air
 import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.CheckCircleOutline
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Emergency
-import androidx.compose.material.icons.outlined.MedicalServices
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.PsychologyAlt
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -50,13 +52,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,181 +74,499 @@ import es.brujula.jitai.core.designsystem.BrujulaGhostButton
 import es.brujula.jitai.core.designsystem.BrujulaPrimaryButton
 import es.brujula.jitai.core.designsystem.BrujulaSurface
 import es.brujula.jitai.core.designsystem.BrujulaTagPill
-import es.brujula.jitai.core.designsystem.TabularNumberStyle
+import es.brujula.jitai.core.designsystem.EditorialSerif
+import es.brujula.jitai.core.model.BreathingPattern
 import es.brujula.jitai.core.model.NurseNavigatorProfile
 import es.brujula.jitai.ui.BrujulaUiState
-import es.brujula.jitai.ui.components.GhbVoluntaryTrackerCard
 import kotlinx.coroutines.delay
 
-private enum class SupportSection(val label: String) {
-    BREATHING("Respirar"),
-    COPING("Afrontamiento"),
-    GUIDE("Guía IA revisada"),
-    NURSE("Enfermería y GHB")
+private enum class CalmSection(val key: String, val label: String) {
+    BREATHING("breathing", "Respirar"),
+    COPING("coping", "Soltar"),
+    GUIDE("guide", "Guía"),
+    NURSE("nurse", "Enfermería")
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SupportScreen(
     state: BrujulaUiState,
     initialSectionKey: String?,
-    onCompletePractice: (toolId: String, title: String, seconds: Int) -> Unit,
-    onSaveNurseProfile: (NurseNavigatorProfile) -> Unit,
-    onLogGhb: (String) -> Unit,
-    onDeleteGhb: (Long) -> Unit,
-    onClearGhb: () -> Unit
+    onCompletePractice: (toolId: String, toolTitle: String, durationSeconds: Int) -> Unit,
+    onSaveNurseProfile: (NurseNavigatorProfile) -> Unit
 ) {
-    val colors = BrujulaDesign.colors
-    val haptics = BrujulaDesign.haptics
     val context = LocalContext.current
+    var selectedTab by rememberSaveable(initialSectionKey) {
+        val mapped = CalmSection.entries.firstOrNull { it.key == initialSectionKey }
+            ?: CalmSection.BREATHING
+        mutableStateOf(mapped)
+    }
 
-    var activeTab by remember(initialSectionKey) {
-        mutableStateOf(
-            when (initialSectionKey) {
-                "breathing" -> SupportSection.BREATHING
-                "coping" -> SupportSection.COPING
-                "guide" -> SupportSection.GUIDE
-                "nurse" -> SupportSection.NURSE
-                else -> SupportSection.BREATHING
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        BrujulaEditorialHeader(
+            title = "Calma y apoyo",
+            subtitle = "Un espacio tranquilo, siempre disponible.",
+            trailingActionLabel = "112",
+            onTrailingAction = {
+                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:112")))
             }
         )
-    }
 
-    // Estado del estudio de respiración guiada
-    val patterns = CuratedClinicalContent.breathingPatterns
-    var selectedPattern by remember { mutableStateOf(patterns.first()) }
-    var isBreathingActive by remember { mutableStateOf(false) }
-    var phaseLabel by remember { mutableStateOf("Pulsa iniciar cuando estés cómodo") }
-    var phaseTargetScale by remember { mutableStateOf(0.58f) }
-    var phaseDurationMs by remember { mutableIntStateOf(1000) }
-    var completedCycles by remember { mutableIntStateOf(0) }
-    var elapsedBreathingSec by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(isBreathingActive, selectedPattern) {
-        if (!isBreathingActive) {
-            phaseLabel = "Pulsa iniciar cuando estés cómodo"
-            phaseTargetScale = 0.58f
-            phaseDurationMs = 800
-            return@LaunchedEffect
+        // Navegación suave por pestañas en píldora
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CalmSection.entries.forEach { tab ->
+                BrujulaTagPill(
+                    label = tab.label,
+                    selected = selectedTab == tab,
+                    onClick = { selectedTab = tab }
+                )
+            }
         }
-        completedCycles = 0
-        elapsedBreathingSec = 0
-        while (isBreathingActive && completedCycles < selectedPattern.recommendedCycles) {
-            // Inhala
-            phaseLabel = "Inhala suave por la nariz (${selectedPattern.inhaleSec} s)"
-            phaseDurationMs = selectedPattern.inhaleSec * 1000
-            phaseTargetScale = 0.96f
-            haptics.gentlePulse()
-            repeat(selectedPattern.inhaleSec) {
-                delay(1000L)
-                elapsedBreathingSec += 1
-            }
-            if (!isBreathingActive) break
 
-            // Retención post-inhalación
-            if (selectedPattern.holdAfterInhaleSec > 0) {
-                phaseLabel = "Sostén sin tensión (${selectedPattern.holdAfterInhaleSec} s)"
-                phaseDurationMs = 400
-                phaseTargetScale = 0.98f
-                haptics.tick()
-                repeat(selectedPattern.holdAfterInhaleSec) {
-                    delay(1000L)
-                    elapsedBreathingSec += 1
-                }
-            }
-            if (!isBreathingActive) break
+        when (selectedTab) {
+            CalmSection.BREATHING -> BreathingSanctuaryPane(
+                onCompletePractice = onCompletePractice
+            )
 
-            // Exhala
-            phaseLabel = "Exhala largo soltando hombros (${selectedPattern.exhaleSec} s)"
-            phaseDurationMs = selectedPattern.exhaleSec * 1000
-            phaseTargetScale = 0.50f
-            haptics.gentlePulse()
-            repeat(selectedPattern.exhaleSec) {
-                delay(1000L)
-                elapsedBreathingSec += 1
-            }
-            if (!isBreathingActive) break
+            CalmSection.COPING -> CopingProgressivePane(
+                onCompletePractice = onCompletePractice
+            )
 
-            // Pausa post-exhalación
-            if (selectedPattern.holdAfterExhaleSec > 0) {
-                phaseLabel = "Reposa en calma (${selectedPattern.holdAfterExhaleSec} s)"
-                phaseDurationMs = 400
-                phaseTargetScale = 0.50f
-                repeat(selectedPattern.holdAfterExhaleSec) {
-                    delay(1000L)
-                    elapsedBreathingSec += 1
-                }
-            }
-            completedCycles += 1
-        }
-        if (isBreathingActive && completedCycles >= selectedPattern.recommendedCycles) {
-            isBreathingActive = false
-            haptics.confirm()
-            onCompletePractice(selectedPattern.id, selectedPattern.title, elapsedBreathingSec)
-            phaseLabel = "Serie completada y guardada en tu progreso privado"
-        }
-    }
+            CalmSection.GUIDE -> CuratedGuidePane()
 
-    val orbScale by animateFloatAsState(
-        targetValue = phaseTargetScale,
-        animationSpec = tween(durationMillis = phaseDurationMs),
-        label = "breathingOrbScale"
-    )
-
-    // Estado del asistente acotado de contenidos revisados
-    var guidanceQuery by remember { mutableStateOf("") }
-    val (urgentDetected, matchedTopics) = remember(guidanceQuery) {
-        CuratedClinicalContent.queryReviewedGuidance(guidanceQuery)
-    }
-
-    // Edición del contacto enfermero
-    var showEditNurseDialog by remember { mutableStateOf(false) }
-    var draftNurseName by remember(state.nurseProfile) { mutableStateOf(state.nurseProfile.nurseName) }
-    var draftCenter by remember(state.nurseProfile) { mutableStateOf(state.nurseProfile.centerName) }
-    var draftPhone by remember(state.nurseProfile) { mutableStateOf(state.nurseProfile.phone) }
-    var draftSchedule by remember(state.nurseProfile) { mutableStateOf(state.nurseProfile.scheduleLabel) }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
-            BrujulaEditorialHeader(
-                eyebrow = "Herramientas permanentes · Parte 2 §2.4 y §2.5",
-                title = "Apoyo y cuidado",
-                subtitle = "Ejercicios fisiológicos breves, recursos revisados de reducción de daños y contacto directo con tu enfermera navegadora."
+            CalmSection.NURSE -> NurseSupportPane(
+                profile = state.nurseProfile,
+                onSaveNurseProfile = onSaveNurseProfile
             )
         }
 
-        // Franja permanente de urgencia 112 (CAME D3→C3: acceso directo al 112 sin esperar al chat)
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(colors.coralWash)
-                    .border(0.9.dp, colors.coralAccent.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "URGENCIA SANITARIA · SIN VIGILANCIA 24 H",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.onCoralWash
+        Spacer(modifier = Modifier.height(14.dp))
+    }
+}
+
+@Composable
+private fun BreathingSanctuaryPane(
+    onCompletePractice: (String, String, Int) -> Unit
+) {
+    val colors = BrujulaDesign.colors
+    val haptics = BrujulaDesign.haptics
+    val patterns = CuratedClinicalContent.breathingPatterns
+
+    var selectedPattern by remember { mutableStateOf(patterns.first()) }
+    var isRunning by rememberSaveable { mutableStateOf(false) }
+    var phaseText by remember { mutableStateOf("Toca para empezar") }
+    var phaseScaleTarget by remember { mutableStateOf(0.68f) }
+    var elapsedSec by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(isRunning, selectedPattern) {
+        if (!isRunning) {
+            phaseText = "Toca para empezar"
+            phaseScaleTarget = 0.68f
+            return@LaunchedEffect
+        }
+        elapsedSec = 0
+        repeat(selectedPattern.recommendedCycles) {
+            // Inhalar
+            phaseText = "Inhala suave"
+            phaseScaleTarget = 1.0f
+            haptics.tick()
+            repeat(selectedPattern.inhaleSec) {
+                delay(1000L)
+                elapsedSec += 1
+            }
+            // Retener lleno
+            if (selectedPattern.holdAfterInhaleSec > 0) {
+                phaseText = "Sostén en calma"
+                phaseScaleTarget = 1.03f
+                repeat(selectedPattern.holdAfterInhaleSec) {
+                    delay(1000L)
+                    elapsedSec += 1
+                }
+            }
+            // Exhalar
+            phaseText = "Suelta despacio"
+            phaseScaleTarget = 0.56f
+            haptics.gentlePulse()
+            repeat(selectedPattern.exhaleSec) {
+                delay(1000L)
+                elapsedSec += 1
+            }
+            // Pausa vacía
+            if (selectedPattern.holdAfterExhaleSec > 0) {
+                phaseText = "Reposa"
+                phaseScaleTarget = 0.56f
+                repeat(selectedPattern.holdAfterExhaleSec) {
+                    delay(1000L)
+                    elapsedSec += 1
+                }
+            }
+        }
+        isRunning = false
+        onCompletePractice(selectedPattern.id, selectedPattern.title, elapsedSec.coerceAtLeast(30))
+    }
+
+    val animatedOrbScale by animateFloatAsState(
+        targetValue = phaseScaleTarget,
+        animationSpec = tween(durationMillis = 950, easing = FastOutSlowInEasing),
+        label = "breathOrbScale"
+    )
+
+    val idleTransition = rememberInfiniteTransition(label = "idleLotus")
+    val idleDrift by idleTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 36000),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "lotusRotation"
+    )
+    val idleBreath by idleTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "idlePulse"
+    )
+
+    // Escenario contemplativo oscuro petróleo para relajar la vista
+    val stageShape = RoundedCornerShape(30.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(stageShape)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0E2530),
+                        Color(0xFF091922)
                     )
-                    Text(
-                        text = "Ante pérdida de conciencia, dolor torácico o crisis aguda, llama al 112 sin esperar respuesta.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.inkPrimary
+                ),
+                shape = stageShape
+            )
+            .border(0.8.dp, Color(0xFFF4EFE6).copy(alpha = 0.12f), stageShape)
+            .padding(horizontal = 20.dp, vertical = 26.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(256.dp)
+                    .clip(CircleShape)
+                    .clickable {
+                        if (isRunning) {
+                            isRunning = false
+                            if (elapsedSec >= 15) {
+                                onCompletePractice(
+                                    selectedPattern.id,
+                                    selectedPattern.title,
+                                    elapsedSec
+                                )
+                            }
+                        } else {
+                            isRunning = true
+                        }
+                    }
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    val maxR = size.minDimension / 2f
+                    val effectiveScale = if (isRunning) animatedOrbScale else (0.72f * idleBreath)
+
+                    // Halo exterior brumoso
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF4AD2B8).copy(alpha = 0.28f),
+                                Color(0xFF289681).copy(alpha = 0.08f),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = maxR * effectiveScale * 1.05f
+                        ),
+                        radius = maxR * effectiveScale * 1.05f,
+                        center = center
+                    )
+
+                    // Loto orgánico de 6 pétalos translúcidos
+                    for (i in 0 until 6) {
+                        rotate(degrees = idleDrift + i * 60f, pivot = center) {
+                            val petalW = maxR * 0.56f * effectiveScale
+                            val petalH = maxR * 0.86f * effectiveScale
+                            drawOval(
+                                color = Color(0xFF5AD8C0).copy(alpha = 0.13f),
+                                topLeft = Offset(center.x - petalW / 2f, center.y - petalH / 2f),
+                                size = Size(petalW, petalH)
+                            )
+                        }
+                    }
+
+                    // Anillos armónicos concéntricos
+                    drawCircle(
+                        color = Color(0xFF6AE0C9).copy(alpha = 0.42f),
+                        radius = maxR * 0.72f * effectiveScale,
+                        center = center,
+                        style = Stroke(width = 1.4.dp.toPx())
+                    )
+                    drawCircle(
+                        color = Color(0xFFF6F2EA).copy(alpha = 0.22f),
+                        radius = maxR * 0.52f * effectiveScale,
+                        center = center,
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                    drawCircle(
+                        color = Color(0xFF1A4352).copy(alpha = 0.82f),
+                        radius = maxR * 0.42f,
+                        center = center
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = phaseText,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontFamily = EditorialSerif,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        color = Color(0xFFF6F2EA),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = selectedPattern.shortTag,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF9EC2CF)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = selectedPattern.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFC7D6DE),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Selector minimalista de cadencias
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                patterns.forEach { pat: BreathingPattern ->
+                    val selected = pat.id == selectedPattern.id
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (selected) Color(0xFF38B89F).copy(alpha = 0.22f)
+                                else Color.White.copy(alpha = 0.06f)
+                            )
+                            .border(
+                                0.8.dp,
+                                if (selected) Color(0xFF5AD8C0) else Color.White.copy(alpha = 0.12f),
+                                RoundedCornerShape(50)
+                            )
+                            .clickable {
+                                isRunning = false
+                                selectedPattern = pat
+                            }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = pat.title,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (selected) Color(0xFF8BF0DB) else Color(0xFFD8E4EA)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            BrujulaPrimaryButton(
+                text = if (isRunning) "Terminar pausa" else "Empezar respiración",
+                icon = if (isRunning) Icons.Outlined.Stop else Icons.Outlined.PlayArrow,
+                containerColor = if (isRunning) colors.amberAccent else Color(0xFF38B89F),
+                contentColor = Color(0xFF06261F),
+                onClick = {
+                    if (isRunning) {
+                        isRunning = false
+                        if (elapsedSec >= 10) {
+                            onCompletePractice(
+                                selectedPattern.id,
+                                selectedPattern.title,
+                                elapsedSec
+                            )
+                        }
+                    } else {
+                        isRunning = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun CopingProgressivePane(
+    onCompletePractice: (String, String, Int) -> Unit
+) {
+    val colors = BrujulaDesign.colors
+    var expandedCardId by rememberSaveable { mutableStateOf<String?>(CuratedClinicalContent.copingExercises.first().id) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        CuratedClinicalContent.copingExercises.forEach { card ->
+            val isExpanded = expandedCardId == card.id
+
+            BrujulaSurface(
+                borderColor = if (isExpanded) colors.jadePrimary.copy(alpha = 0.45f) else colors.borderHairline.copy(alpha = 0.50f),
+                contentPadding = PaddingValues(20.dp),
+                onClick = {
+                    expandedCardId = if (isExpanded) null else card.id
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "${card.category} · ${card.durationLabel}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.jadePrimary
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = card.title,
+                            style = MaterialTheme.typography.titleLarge.copy(fontFamily = EditorialSerif),
+                            color = colors.inkPrimary
+                        )
+                    }
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = null,
+                        tint = colors.inkMuted
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = card.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkSecondary
+                )
+
+                AnimatedVisibility(visible = isExpanded) {
+                    Column(modifier = Modifier.padding(top = 14.dp)) {
+                        card.steps.forEachIndexed { idx, step ->
+                            Row(
+                                modifier = Modifier.padding(vertical = 5.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 7.dp)
+                                        .size(6.dp)
+                                        .background(colors.jadePrimary, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = step,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.inkPrimary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        BrujulaTagPill(
+                            label = "Me ha servido · guardar pausa",
+                            selected = true,
+                            icon = Icons.Outlined.Check,
+                            onClick = {
+                                onCompletePractice(card.id, card.title, 180)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CuratedGuidePane() {
+    val colors = BrujulaDesign.colors
+    val context = LocalContext.current
+    var query by rememberSaveable { mutableStateOf("") }
+    var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val (urgentDetected, topics) = remember(query) {
+        CuratedClinicalContent.queryReviewedGuidance(query)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text("Buscar duda concreta (agua, sueño, PrEP, límites…)") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = colors.inkMuted
+                )
+            },
+            shape = RoundedCornerShape(50),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (urgentDetected) {
+            BrujulaSurface(
+                containerColor = colors.coralWash,
+                borderColor = colors.coralAccent.copy(alpha = 0.45f),
+                contentPadding = PaddingValues(18.dp)
+            ) {
+                Text(
+                    text = "Si hay una urgencia médica ahora",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onCoralWash
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Llama al 112 sin esperar. La prioridad sanitaria es cuidar la vida.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkPrimary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 BrujulaPrimaryButton(
-                    text = "112",
-                    icon = Icons.Outlined.Emergency,
+                    text = "Llamar al 112",
+                    icon = Icons.Outlined.Call,
                     containerColor = colors.coralAccent,
                     contentColor = Color.White,
                     onClick = {
@@ -252,420 +576,169 @@ fun SupportScreen(
             }
         }
 
-        // Selector de sección
-        item {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalArrangement = Arrangement.spacedBy(7.dp)
+        topics.forEach { topic ->
+            val isExpanded = expandedId == topic.id
+
+            BrujulaSurface(
+                contentPadding = PaddingValues(20.dp),
+                onClick = { expandedId = if (isExpanded) null else topic.id }
             ) {
-                SupportSection.entries.forEach { tab ->
-                    val icon = when (tab) {
-                        SupportSection.BREATHING -> Icons.Outlined.Air
-                        SupportSection.COPING -> Icons.Outlined.SelfImprovement
-                        SupportSection.GUIDE -> Icons.Outlined.PsychologyAlt
-                        SupportSection.NURSE -> Icons.Outlined.MedicalServices
-                    }
-                    BrujulaTagPill(
-                        label = tab.label,
-                        icon = icon,
-                        selected = activeTab == tab,
-                        onClick = { activeTab = tab }
-                    )
-                }
-            }
-        }
-
-        when (activeTab) {
-            SupportSection.BREATHING -> {
-                item {
-                    BrujulaSurface {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Selecciona cadencia respiratoria",
+                            text = topic.category,
                             style = MaterialTheme.typography.labelMedium,
-                            color = colors.inkMuted
+                            color = if (topic.showEmergency112Banner) colors.amberAccent else colors.jadePrimary
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            patterns.forEach { pat ->
-                                BrujulaTagPill(
-                                    label = pat.title,
-                                    selected = selectedPattern.id == pat.id,
-                                    onClick = {
-                                        isBreathingActive = false
-                                        selectedPattern = pat
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = selectedPattern.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.inkSecondary
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Esfera respiratoria animada en Jade y Petróleo
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(206.dp)
-                        ) {
-                            Canvas(modifier = Modifier.size(196.dp)) {
-                                val maxR = size.minDimension / 2f
-                                drawCircle(
-                                    color = colors.jadePrimary.copy(alpha = 0.16f),
-                                    radius = maxR * 0.95f,
-                                    style = Stroke(width = 1.2.dp.toPx())
-                                )
-                                drawCircle(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            colors.jadeLuminous.copy(alpha = 0.85f),
-                                            colors.petroleumAccent.copy(alpha = 0.85f)
-                                        )
-                                    ),
-                                    radius = maxR * orbScale
-                                )
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = if (isBreathingActive) {
-                                        "Ciclo ${completedCycles + 1}/${selectedPattern.recommendedCycles}"
-                                    } else {
-                                        "${selectedPattern.recommendedCycles} ciclos"
-                                    },
-                                    style = MaterialTheme.typography.labelLarge.merge(TabularNumberStyle),
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = phaseLabel,
+                            text = topic.title,
                             style = MaterialTheme.typography.titleMedium,
-                            color = colors.inkPrimary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            BrujulaPrimaryButton(
-                                text = if (isBreathingActive) "Detener pausa" else "Iniciar ejercicio",
-                                icon = if (isBreathingActive) Icons.Outlined.Stop else Icons.Outlined.PlayArrow,
-                                onClick = {
-                                    if (isBreathingActive && elapsedBreathingSec >= 15) {
-                                        onCompletePractice(
-                                            selectedPattern.id,
-                                            selectedPattern.title,
-                                            elapsedBreathingSec
-                                        )
-                                    }
-                                    isBreathingActive = !isBreathingActive
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            SupportSection.COPING -> {
-                items(CuratedClinicalContent.copingExercises, key = { it.id }) { exercise ->
-                    BrujulaSurface {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = exercise.category.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.jadePrimary
-                            )
-                            Text(
-                                text = exercise.durationLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = colors.inkMuted
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = exercise.title,
-                            style = MaterialTheme.typography.headlineSmall,
                             color = colors.inkPrimary
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = exercise.summary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.inkSecondary
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        exercise.steps.forEachIndexed { idx, step ->
+                    }
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = null,
+                        tint = colors.inkMuted
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = topic.reviewedResponse,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkSecondary
+                )
+
+                AnimatedVisibility(visible = isExpanded) {
+                    Column(modifier = Modifier.padding(top = 12.dp)) {
+                        topic.keyTakeaways.forEach { point ->
                             Row(
-                                verticalAlignment = Alignment.Top,
-                                modifier = Modifier.padding(vertical = 3.dp)
+                                modifier = Modifier.padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Text(
-                                    text = "${idx + 1}.",
-                                    style = MaterialTheme.typography.labelLarge.merge(TabularNumberStyle),
-                                    color = colors.jadePrimary,
-                                    modifier = Modifier.width(20.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 7.dp)
+                                        .size(5.dp)
+                                        .background(colors.jadePrimary, CircleShape)
                                 )
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = step,
+                                    text = point,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.inkPrimary
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        BrujulaGhostButton(
-                            text = "Registrar práctica en mi progreso",
-                            icon = Icons.Outlined.CheckCircleOutline,
-                            accentColor = colors.jadePrimary,
-                            onClick = {
-                                onCompletePractice(exercise.id, exercise.title, 180)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
-                }
-            }
-
-            SupportSection.GUIDE -> {
-                item {
-                    BrujulaSurface(
-                        containerColor = colors.surfaceSubtle
-                    ) {
-                        Text(
-                            text = "IDENTIFICACIÓN TRANSPARENTE · IA ACOTADA A CONTENIDOS REVISADOS",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.petroleumAccent
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Este asistente automatizado responde únicamente con materiales revisados por profesionales de salud sexual y reducción de daños. No realiza diagnósticos, no calcula dosis ni modifica tus reglas clínicas.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.inkSecondary
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = guidanceQuery,
-                            onValueChange = { guidanceQuery = it },
-                            leadingIcon = {
-                                Icon(Icons.Outlined.Search, contentDescription = null)
-                            },
-                            label = { Text("Consultar tema revisado") },
-                            placeholder = { Text("Ej. PrEP, PEP, hidratación, sueño, límites, GHB...") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-
-                if (urgentDetected) {
-                    item {
-                        BrujulaSurface(
-                            containerColor = colors.coralWash,
-                            borderColor = colors.coralAccent
-                        ) {
-                            Text(
-                                text = "Detectada consulta de posible riesgo agudo",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = colors.onCoralWash
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Si tú o alguien contigo tiene dificultad para respirar, no despierta o presenta dolor torácico intenso, no esperes a leer guías: llama inmediatamente al 112.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.inkPrimary
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            BrujulaPrimaryButton(
-                                text = "Llamar ahora al 112",
-                                icon = Icons.Outlined.Emergency,
-                                containerColor = colors.coralAccent,
-                                contentColor = Color.White,
-                                onClick = {
-                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:112")))
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-
-                items(matchedTopics, key = { it.id }) { topic ->
-                    BrujulaSurface {
-                        Text(
-                            text = topic.category.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.jadePrimary
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = topic.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = colors.inkPrimary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = topic.reviewedResponse,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.inkSecondary
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        HorizontalDivider(color = colors.borderHairline)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        topic.keyTakeaways.forEach { bullet ->
-                            Text(
-                                text = "• $bullet",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.inkPrimary,
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            SupportSection.NURSE -> {
-                item {
-                    BrujulaSurface {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "REFERENTE CLÍNICO CONFIGURABLE",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.jadePrimary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = state.nurseProfile.nurseName,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = colors.inkPrimary
-                                )
-                                Text(
-                                    text = state.nurseProfile.centerName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.inkSecondary
-                                )
-                            }
-                            TextButton(onClick = { showEditNurseDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Edit,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Configurar")
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-                        HorizontalDivider(color = colors.borderHairline)
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Text(
-                            text = "Horario acordado: ${state.nurseProfile.scheduleLabel}",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = colors.inkPrimary
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = state.nurseProfile.responseSlaLabel,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.inkSecondary
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "Coordinación: adicciones, salud mental, salud sexual (PrEP/ITS) y entidades comunitarias.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.inkMuted
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            BrujulaPrimaryButton(
-                                text = "Llamar a enfermería",
-                                icon = Icons.Outlined.Call,
-                                onClick = {
-                                    val cleanPhone = state.nurseProfile.phone.filter { it.isDigit() || it == '+' }
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone"))
-                                    )
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    GhbVoluntaryTrackerCard(
-                        logs = state.ghbLogs,
-                        discreetMode = state.settings.discreetModeEnabled,
-                        onLogNewEntry = onLogGhb,
-                        onDeleteEntry = onDeleteGhb,
-                        onClearAll = onClearGhb
-                    )
                 }
             }
         }
+    }
+}
 
-        item { Spacer(modifier = Modifier.height(14.dp)) }
+@Composable
+private fun NurseSupportPane(
+    profile: NurseNavigatorProfile,
+    onSaveNurseProfile: (NurseNavigatorProfile) -> Unit
+) {
+    val colors = BrujulaDesign.colors
+    val context = LocalContext.current
+    var showEditDialog by rememberSaveable { mutableStateOf(false) }
+
+    BrujulaSurface(contentPadding = PaddingValues(24.dp)) {
+        Text(
+            text = "Acompañamiento profesional",
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.jadePrimary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = profile.nurseName,
+            style = MaterialTheme.typography.headlineSmall.copy(fontFamily = EditorialSerif),
+            color = colors.inkPrimary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = profile.centerName,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.inkSecondary
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "${profile.scheduleLabel} · ${profile.contactChannelNote}",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.inkMuted
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BrujulaPrimaryButton(
+                text = "Llamar",
+                icon = Icons.Outlined.Call,
+                onClick = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:${profile.phone}"))
+                    )
+                },
+                modifier = Modifier.weight(1f)
+            )
+            BrujulaGhostButton(
+                text = "Editar",
+                icon = Icons.Outlined.Edit,
+                onClick = { showEditDialog = true },
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 
-    if (showEditNurseDialog) {
+    if (showEditDialog) {
+        var name by rememberSaveable { mutableStateOf(profile.nurseName) }
+        var center by rememberSaveable { mutableStateOf(profile.centerName) }
+        var phone by rememberSaveable { mutableStateOf(profile.phone) }
+        var schedule by rememberSaveable { mutableStateOf(profile.scheduleLabel) }
+
         AlertDialog(
-            onDismissRequest = { showEditNurseDialog = false },
-            title = { Text("Contacto de enfermería navegadora") },
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Contacto enfermero") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = draftNurseName,
-                        onValueChange = { draftNurseName = it },
-                        label = { Text("Profesional de referencia") },
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nombre o referente") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = draftCenter,
-                        onValueChange = { draftCenter = it },
-                        label = { Text("Centro o unidad asistencial") },
+                        value = center,
+                        onValueChange = { center = it },
+                        label = { Text("Centro o unidad") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = draftPhone,
-                        onValueChange = { draftPhone = it },
-                        label = { Text("Teléfono de contacto") },
+                        value = phone,
+                        onValueChange = { phone = it },
+                        label = { Text("Teléfono") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = draftSchedule,
-                        onValueChange = { draftSchedule = it },
-                        label = { Text("Horario de atención acordado") },
+                        value = schedule,
+                        onValueChange = { schedule = it },
+                        label = { Text("Horario habitual") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -675,21 +748,21 @@ fun SupportScreen(
                 TextButton(
                     onClick = {
                         onSaveNurseProfile(
-                            state.nurseProfile.copy(
-                                nurseName = draftNurseName.trim().ifBlank { state.nurseProfile.nurseName },
-                                centerName = draftCenter.trim().ifBlank { state.nurseProfile.centerName },
-                                phone = draftPhone.trim().ifBlank { state.nurseProfile.phone },
-                                scheduleLabel = draftSchedule.trim().ifBlank { state.nurseProfile.scheduleLabel }
+                            profile.copy(
+                                nurseName = name.trim().ifBlank { profile.nurseName },
+                                centerName = center.trim(),
+                                phone = phone.trim(),
+                                scheduleLabel = schedule.trim()
                             )
                         )
-                        showEditNurseDialog = false
+                        showEditDialog = false
                     }
                 ) {
                     Text("Guardar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEditNurseDialog = false }) {
+                TextButton(onClick = { showEditDialog = false }) {
                     Text("Cancelar")
                 }
             }

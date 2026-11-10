@@ -6,7 +6,6 @@ import es.brujula.jitai.core.model.CopingSessionLog
 import es.brujula.jitai.core.model.DayPlanItem
 import es.brujula.jitai.core.model.DayTimeBlock
 import es.brujula.jitai.core.model.EmaCheckIn
-import es.brujula.jitai.core.model.GhbVoluntaryLog
 import es.brujula.jitai.core.model.JitaiActionKind
 import es.brujula.jitai.core.model.JitaiDecisionRecord
 import es.brujula.jitai.core.model.JitaiTriggerSource
@@ -127,19 +126,6 @@ fun DayPlanItem.toEntity() = DayPlanItemEntity(
     chosenAlternative = chosenAlternative,
     completed = completed
 )
-
-@Entity(tableName = "ghb_logs")
-data class GhbVoluntaryLogEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val timestampMillis: Long,
-    val contextNote: String
-) {
-    fun toDomain() = GhbVoluntaryLog(
-        id = id,
-        timestampMillis = timestampMillis,
-        contextNote = contextNote
-    )
-}
 
 @Entity(tableName = "coping_sessions")
 data class CopingSessionLogEntity(

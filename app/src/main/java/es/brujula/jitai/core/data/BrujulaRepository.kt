@@ -2,7 +2,6 @@ package es.brujula.jitai.core.data
 
 import es.brujula.jitai.core.database.BrujulaDao
 import es.brujula.jitai.core.database.CopingSessionLogEntity
-import es.brujula.jitai.core.database.GhbVoluntaryLogEntity
 import es.brujula.jitai.core.database.MilestoneReflectionEntity
 import es.brujula.jitai.core.database.toEntity
 import es.brujula.jitai.core.datastore.PreferencesRepository
@@ -14,7 +13,6 @@ import es.brujula.jitai.core.model.AgreedClinicalSummaryExport
 import es.brujula.jitai.core.model.CopingSessionLog
 import es.brujula.jitai.core.model.DayPlanItem
 import es.brujula.jitai.core.model.EmaCheckIn
-import es.brujula.jitai.core.model.GhbVoluntaryLog
 import es.brujula.jitai.core.model.JitaiDecisionRecord
 import es.brujula.jitai.core.model.JitaiExperimentalSettings
 import es.brujula.jitai.core.model.MilestoneReflection
@@ -51,9 +49,6 @@ class BrujulaRepository(
         .map { list -> list.map { it.toDomain() } }
 
     val dayPlanFlow: Flow<List<DayPlanItem>> = dao.observeDayPlan()
-        .map { list -> list.map { it.toDomain() } }
-
-    val ghbLogsFlow: Flow<List<GhbVoluntaryLog>> = dao.observeGhbLogs()
         .map { list -> list.map { it.toDomain() } }
 
     val copingSessionsFlow: Flow<List<CopingSessionLog>> = dao.observeCopingSessions()
@@ -113,7 +108,7 @@ class BrujulaRepository(
         if (outcome.shouldSendNotification) {
             sentPush = notifier.sendNeutralOrientationPrompt(
                 discreetMode = settings.discreetModeEnabled,
-                customNeutralSubtitle = "Franja planificada activa · Tu alternativa está disponible."
+                customNeutralSubtitle = "Tienes preparada una alternativa tranquila para esta hora."
             )
             if (sentPush) {
                 prefs.recordNotificationSent()
@@ -145,7 +140,6 @@ class BrujulaRepository(
         prefs.clearTwentyMinuteReevaluation()
     }
 
-    // Zonas y ubicación opcional en dispositivo
     suspend fun saveZone(zone: PersonalZone) {
         dao.upsertZone(zone.toEntity())
     }
@@ -172,7 +166,6 @@ class BrujulaRepository(
         return snapshot to match
     }
 
-    // Planificación Mi día
     suspend fun saveDayPlanItem(item: DayPlanItem) {
         dao.upsertDayPlanItem(item.toEntity())
     }
@@ -185,25 +178,6 @@ class BrujulaRepository(
         dao.deleteDayPlanItem(itemId)
     }
 
-    // Registro voluntario GHB/GBL (sin recomendar dosis ni intervalos seguros)
-    suspend fun logVoluntaryGhbEntry(note: String = "", timestampMillis: Long = System.currentTimeMillis()) {
-        dao.insertGhbLog(
-            GhbVoluntaryLogEntity(
-                timestampMillis = timestampMillis,
-                contextNote = note.trim()
-            )
-        )
-    }
-
-    suspend fun deleteGhbEntry(logId: Long) {
-        dao.deleteGhbLog(logId)
-    }
-
-    suspend fun clearGhbHistory() {
-        dao.clearAllGhbLogs()
-    }
-
-    // Sesiones de respiración y afrontamiento
     suspend fun recordCopingPractice(
         toolId: String,
         toolTitle: String,
@@ -221,7 +195,6 @@ class BrujulaRepository(
         )
     }
 
-    // Hitos semanas 0, 6 y 12
     suspend fun saveMilestoneReflection(reflection: MilestoneReflection) {
         val existing = milestonesFlow.first().firstOrNull { it.checkpointWeek == reflection.checkpointWeek }
         dao.upsertMilestoneReflection(
@@ -238,7 +211,6 @@ class BrujulaRepository(
         )
     }
 
-    // Configuración y privacidad
     suspend fun updateThresholds(
         cravingThreshold: Int,
         controlThreshold: Int,
@@ -285,38 +257,31 @@ class BrujulaRepository(
         return listOf(
             PrivateMilestoneBadge(
                 id = "first_compass",
-                title = "Cartografía propia",
-                description = "Configurar tus espacios verdes y contextos sensibles para anticiparte sin juicios.",
+                title = "Mapa propio",
+                description = "Tener ubicados tus espacios refugio y lugares sensibles.",
                 unlocked = zones.size >= 2,
-                progressLabel = "${zones.size} zonas definidas"
+                progressLabel = if (zones.size >= 2) "Activo" else "En camino"
             ),
             PrivateMilestoneBadge(
                 id = "flexible_alternatives",
-                title = "Plan B elegido por ti",
-                description = "Tener alternativas propias preparadas para momentos vulnerables de la semana.",
+                title = "Un Plan B amable",
+                description = "Dejar pensada una alternativa tranquila para tus horas difíciles.",
                 unlocked = vulnerableWithAlt >= 1,
-                progressLabel = "$vulnerableWithAlt alternativas listas"
+                progressLabel = if (vulnerableWithAlt >= 1) "Listo" else "Opcional"
             ),
             PrivateMilestoneBadge(
                 id = "calm_practice",
-                title = "Anclaje en práctica",
-                description = "Practicar ejercicios breves de respiración o afrontamiento (sin rachas obligatorias).",
+                title = "Pausa respirada",
+                description = "Dedicar unos minutos a bajar revoluciones en el cuerpo.",
                 unlocked = copingSessions.isNotEmpty(),
-                progressLabel = "${copingSessions.size} prácticas realizadas"
+                progressLabel = if (copingSessions.isNotEmpty()) "Integrado" else "Abierto"
             ),
             PrivateMilestoneBadge(
                 id = "self_observation",
-                title = "Escucha honesta",
-                description = "Completar registros EMA para conocer mejor tu ánimo, deseo y margen de control.",
+                title = "Escucha sin juicio",
+                description = "Parar a notar cómo estás sin exigirte perfección.",
                 unlocked = checkIns.size >= 3,
-                progressLabel = "${checkIns.size} registros acumulados"
-            ),
-            PrivateMilestoneBadge(
-                id = "co_designed_rules",
-                title = "Reglas a tu medida",
-                description = "Revisar o personalizar tus umbrales experimentales y horarios de silencio.",
-                unlocked = settings.ruleVersion >= 2,
-                progressLabel = "Versión v${settings.ruleVersion}"
+                progressLabel = if (checkIns.size >= 3) "Presente" else "Suave"
             )
         )
     }
@@ -346,7 +311,7 @@ class BrujulaRepository(
 
         val summary = AgreedClinicalSummaryExport(
             generatedAtIso = Instant.now().toString(),
-            privacyNotice = "Resumen voluntario generado en el dispositivo (CAME F3→M3). Excluye coordenadas GPS, nombres de zonas exactas y notas privadas no seleccionadas.",
+            privacyNotice = "Resumen voluntario generado en el dispositivo. Excluye coordenadas GPS y nombres de zonas.",
             programWeek = settings.currentProgramWeek,
             goal = settings.programGoal.title,
             totalCheckInsCompleted = checkIns.size,
@@ -357,7 +322,7 @@ class BrujulaRepository(
             copingSessionsCompleted = coping.size,
             configuredZonesCount = zones.size,
             ruleVersion = settings.ruleVersion,
-            thresholdsSummary = "Craving ≥${settings.cravingThreshold}/10 · Control ≤${settings.controlThreshold}/10 · Máx ${settings.maxDailyNotifications}/día",
+            thresholdsSummary = "Impulso ≥${settings.cravingThreshold}/10 · Margen ≤${settings.controlThreshold}/10 · Máx ${settings.maxDailyNotifications}/día",
             milestoneReflections = milestones
         )
         return exportJson.encodeToString(summary)
@@ -367,7 +332,6 @@ class BrujulaRepository(
         dao.clearCheckIns()
         dao.clearZones()
         dao.clearDayPlan()
-        dao.clearAllGhbLogs()
         dao.clearCopingSessions()
         dao.clearMilestones()
         dao.clearDecisions()

@@ -1,55 +1,52 @@
 # BRÚJULA · Intervención Adaptativa Justo a Tiempo (JITAI) en Salud Digital
 
-**BRÚJULA** es una aplicación Android nativa escrita en **Kotlin** y **Jetpack Compose** que materializa un programa ambulatorio híbrido de **intervención adaptativa justo a tiempo (*Just-In-Time Adaptive Intervention*, JITAI)** para el acompañamiento, la autorregulación y la reducción de daños asociados al consumo problemático de sustancias en contextos de *chemsex*.
+**BRÚJULA** es una aplicación Android nativa escrita en **Kotlin** y **Jetpack Compose** que materializa un programa ambulatorio híbrido de **intervención adaptativa justo a tiempo (*Just-In-Time Adaptive Intervention*, JITAI)** para el acompañamiento, la autorregulación y la reducción de daños en contextos de *chemsex*.
 
-> **Principio rector:** Orientación, autonomía y acompañamiento clínico cálido; nunca vigilancia, diagnóstico automático ni culpabilización. BRÚJULA no equipara *chemsex* con adicción ni patologiza el deseo sexual.
+> **Principio rector:** Orientación, serenidad visual, autonomía y acompañamiento clínico cálido; nunca vigilancia, sobrecarga cognitiva, diagnóstico automático ni culpabilización. BRÚJULA no equipara *chemsex* con adicción ni patologiza el deseo sexual.
 
 ---
 
-## 1. Identidad Visual y Experiencia Emocional
+## 1. Diseño Minimalista y Refugio Emocional (`v1.1.0`)
 
-- **Metáfora central — La Brújula Viva:** Representación vectorial interactiva en `Canvas` con física de muelle amortiguado, 72 marcas acimutales, halo respiratorio sutil y respuesta táctil al giro. Refleja suavemente el rumbo autoinformado (*Rumbo sereno*, *Energía y deseo autónomo*, *Brisa cambiante*, *Oleaje intenso*) sin emitir etiquetas diagnósticas.
-- **Paleta cromática:**
+Cuando existe impulso intenso o ruido mental, enfrentarse a cifras, tablas o textos densos embota la mente. BRÚJULA prioriza una **interfaz contemplativa, visual y silenciosa**:
+
+- **La Brújula Escultórica (`LivingCompassCanvas`):** Esfera mineral en Azul Petróleo profundo con rosa de los vientos en filigrana, doble halo respiratorio y aguja magnética facetada con física de muelle suave. Refleja el estado autoinformado (*Aguas tranquilas*, *Pulso vital*, *Brisa cambiante*, *Oleaje intenso*) sin emitir etiquetas diagnósticas.
+- **Cero ruido numérico a primera vista:** Las escalas táctiles muestran palabras humanas cualitativas (*En calma*, *Sereno*, *Con aire*, *Luminoso*) y revelan los detalles paso a paso solo al tocar (*divulgación progresiva*).
+- **Paleta cromática orgánica:**
   - **Verde Jade** (`#1B7463` / `#48C4AC`): orientación, autonomía y calma vital.
   - **Marfil Cálido** (`#FAF7F1` / `#FFFDF9`): lienzo luminoso alejado de la frialdad hospitalaria.
-  - **Azul Petróleo** (`#0E2530` / `#0A161D`): contraste legible y modo oscuro nocturno profundo.
-  - **Ámbar Cálido** (`#D98A29`) y **Coral Terracota** (`#D8634C`): atención contextual cercana sin semántica punitiva.
-- **Tipografía, Háptica y Accesibilidad:** Jerarquía editorial serif/sans, numeración tabular (`tnum`) en cronómetros y escalas `0–10` de precisión táctil, microvibraciones sutiles desactivables, modo claro/oscuro/automático, modo discreto reforzado y ampliación tipográfica (`+12%`). Optimizada para pantallas de alta densidad como **Samsung Galaxy S25 Ultra**.
+  - **Azul Petróleo** (`#0E2530` / `#0A161D`): profundidad serena y modo oscuro nocturno.
+  - **Ámbar Cálido** (`#D98A29`) y **Coral Terracota** (`#D8634C`): atención cercana sin semántica de alarma.
+- **Navegación flotante y háptica sutil:** Cabecera editorial limpia, muelle inferior flotante redondeado, microvibraciones suaves desactivables, modo claro/oscuro/automático, modo discreto y ampliación tipográfica (`+12%`). Optimizada para **Samsung Galaxy S25 Ultra**.
 
 ---
 
-## 2. Pantallas y Funcionalidades Conectadas
+## 2. Pantallas Conectadas
 
-1. **Inicio / Mi brújula (`HomeScreen`):**
-   - Brújula interactiva en tiempo real, lema personal editable, lectura contextual explicable, siguiente actividad planificada de *Mi día*, accesos de un toque al apoyo y registro voluntario de GHB/GBL.
-2. **Check-in EMA (`CheckInScreen`):**
-   - Evaluación ecológica momentánea rápida (`< 45 s`) con escalas táctiles `0–10` para **ánimo**, **craving**, **deseo sexual independiente** (aislado del motor de alertas para no patologizar la sexualidad) y **control percibido**, más interruptores de disponibilidad y conducción segura, y modo de reevaluación voluntaria a los 20 minutos.
-3. **Mis zonas (`ZonesScreen`):**
-   - Cartografía personal interactiva (`Canvas` con zoom, desplazamiento y pulsación prolongada para crear zonas) con **zonas verdes** (apoyo), **amarillas** (vulnerabilidad) y **rojas** (desencadenantes), radio configurable y **geolocalización local opcional** procesada exclusivamente dentro del teléfono (`LocationManager`).
+1. **Brújula (`HomeScreen`):**
+   - Escenario atmosférico sin contadores, rosa náutica interactiva, frase personal editable, tarjetas ilustradas en `Canvas` (*Calma* y *Espacios*), siguiente ancla del día y acceso discreto a enfermería y `112`.
+2. **Sentir (`CheckInScreen`):**
+   - Valoración rápida con deslizadores orgánicos cualitativos para **ánimo**, **impulso de consumir**, **deseo sexual independiente** (aislado del motor de alertas) y **sensación de margen**, píldoras ligeras de disponibilidad/conducción y respuesta acogedora tras guardar.
+3. **Zonas (`ZonesScreen`):**
+   - Radar cartográfico luminoso con constelación de espacios **refugio** (verdes), **atención** (ámbar) y **sensibles** (coral), creación con un toque en el lienzo y geolocalización local opcional procesada exclusivamente en el teléfono.
 4. **Mi día (`MyDayScreen`):**
-   - Planificación flexible por franjas (*Mañana*, *Tarde*, *Noche*, *Madrugada*), identificación anticipada de momentos sensibles y elección de actividades alternativas protectoras.
-5. **Apoyo (`SupportScreen`):**
-   - Guía respiratoria animada con cadencia háptica (*Suspiro fisiológico*, *Coherencia 4-6*, *Caja 4-4-4-4*), ejercicios breves de afrontamiento de 3 minutos (*Surfear la ola*, *Anclaje sensorial 5-4-3-2-1*, *Pausa de margen*), **guía conversacional acotada a contenido clínico revisado** (reducción de daños, hidratación/descanso, PrEP/PEP/ITS, señales de alarma con derivación directa al `112`), registro voluntario de GHB/GBL y contacto configurable con **enfermería navegadora**.
-6. **Mi progreso (`ProgressScreen`):**
-   - Horizonte flexible de 12 semanas compatible con metas de reducción de daños, pausa temporal o abstinencia; curva interactiva multi-serie (*Control percibido*, *Ánimo*, *Craving*); autoevaluaciones de **Inicio**, **Semana 6** y **Semana 12**; e hitos privados discretos **sin rachas que se rompan ni penalización por recaídas**.
-7. **Configuración (`SettingsScreen`):**
-   - Privacidad desde el diseño, modo discreto, permisos revocables en cualquier momento, edición y **versionado auditable** de umbrales experimentales JITAI, trazas explicables de decisiones, prueba de notificación neutra, exportación local de **resumen clínico pactado en JSON** (omitiendo coordenadas) y borrado total irreversible en el dispositivo.
-
-### Salvaguarda específica en el registro voluntario de GHB/GBL
-El componente `GhbVoluntaryTrackerCard` muestra en tiempo real (`HH:MM:SS`) únicamente el **tiempo transcurrido desde el registro voluntario anterior**, acompañado de advertencia expresa: **no calcula ni recomienda dosis, mililitros ni intervalos considerados «seguros»**, y ofrece marcación directa al `112` ante somnolencia intensa o depresión respiratoria.
+   - Arco solar visual de la jornada, planificación flexible por franjas (*Mañana*, *Tarde*, *Noche*, *Madrugada*), preparación de alternativas amables (*plan B*) e ideas rápidas de un toque.
+5. **Calma (`SupportScreen`):**
+   - Loto/aurora respiratoria multicapa animada (*Suspiro suave 4·2·6*, *Equilibrio 4·4·4·4*, *Descanso nocturno 4·0·7*), ejercicios breves desplegables sin muros de texto, guía clínica revisada de reducción de daños y contacto directo configurable con **enfermería referente**.
+6. **Mi camino (`ProgressScreen`):**
+   - Horizonte visual de 12 etapas, onda orgánica con relleno degradado (*Margen*, *Ánimo*, *Impulso*), pausas de reflexión personal (*Punto de partida*, *Mitad de camino*, *Mirada amplia*) y huellas propias sin rachas punitivas.
+7. **Ajustes (`SettingsScreen`):**
+   - Aspecto, modo discreto, permisos revocables, sensibilidad experimental JITAI plegable para evitar saturación visual, exportación local de resumen pactado en JSON y borrado total en el dispositivo.
 
 ---
 
 ## 3. Motor JITAI Local y Explicable (`JitaiEngine`)
 
-Todas las reglas se evalúan localmente en milisegundos y pueden auditarse desde la interfaz (`¿Por qué veo esto?`):
-
-- **Craving elevado o bajo control percibido:** Si `craving ≥ 7/10` o `control percibido ≤ 3/10`, la persona está **disponible** y **no está conduciendo**, BRÚJULA ofrece elegir entre un ejercicio breve de afrontamiento (3 min) o contactar con enfermería navegadora, y habilita una reevaluación voluntaria a los 20 minutos.
-- ** Independencia del deseo sexual:** Un deseo sexual alto (`8–10/10`) con craving bajo y control conservado **nunca dispara alertas**.
-- **Entrada en zona amarilla o roja:** Propone únicamente un **check-in voluntario y neutro**, sin inferir consumo ni exponer el nombre del lugar en notificaciones.
-- **Protección frente a fatiga de alertas:** Máximo **2 notificaciones automáticas diarias**, respeto estricto del **periodo de silencio nocturno** configurable (por defecto `23:00 – 08:00`) y **pausa automática de 4 horas** tras posponer o rechazar una sugerencia.
-- **Acceso manual permanente:** Todas las herramientas de respiración, afrontamiento, reducción de daños y urgencias (`112`) permanecen abiertas las 24 horas con independencia de límites o pausas automáticas.
-- **Naturaleza experimental:** Los puntos de corte iniciales son hipótesis operativas configurables y versionadas (`v1`, `v2`, …), no umbrales diagnósticos clínicos validados.
+- **Impulso intenso o poco margen:** Si `impulso ≥ 7/10` o `margen ≤ 3/10`, la persona está **disponible** y **no está conduciendo**, BRÚJULA sugiere suavemente respirar 3 minutos o contactar con enfermería, habilitando una reevaluación opcional a los 20 minutos.
+- **Independencia del deseo sexual:** Un deseo sexual alto con impulso bajo y margen conservado **nunca dispara alertas**.
+- **Espacios de atención o sensibles:** Propone únicamente parar un segundo a sentir cómo estás, sin inferir consumo ni mostrar nombres de lugares en notificaciones.
+- **Protección frente a saturación:** Máximo **2 avisos automáticos diarios**, **horas de silencio** configurables (`23:00 – 08:00`) y **pausa automática de 4 horas** tras posponer una sugerencia.
+- **Acceso manual permanente:** Todas las herramientas de respiración, calma, guía y urgencias (`112`) están siempre disponibles.
 
 ---
 
@@ -58,16 +55,16 @@ Todas las reglas se evalúan localmente en milisegundos y pueden auditarse desde
 ```text
 app/src/main/java/es/brujula/jitai/
 ├── core/
-│   ├── data/           # BrujulaRepository + CuratedClinicalContent (guía revisada sin alucinación libre)
-│   ├── database/       # Room SQLite local (entidades, DAO y semilla realista inicial)
-│   ├── datastore/      # DataStore Preferences (reglas JITAI versionadas, privacidad y perfil enfermero)
-│   ├── designsystem/   # Paleta Jade/Marfil/Petróleo, tipografía tabular, háptica y escalas táctiles
-│   ├── jitai/          # JitaiEngine (reglas explicables) + BrujulaNotifier (avisos neutros)
-│   ├── location/       # LocalZoneMonitor (geolocalización 100% en dispositivo con LocationManager)
+│   ├── data/           # BrujulaRepository + CuratedClinicalContent
+│   ├── database/       # Room SQLite local v2 (entidades, DAO y semilla inicial)
+│   ├── datastore/      # DataStore Preferences (sensibilidad JITAI, privacidad y enfermería)
+│   ├── designsystem/   # Paleta Jade/Marfil/Petróleo, tipografía editorial, háptica y controles orgánicos
+│   ├── jitai/          # JitaiEngine (reglas explicables) + BrujulaNotifier
+│   ├── location/       # LocalZoneMonitor (geolocalización 100% en dispositivo)
 │   └── model/          # Modelos de dominio serializables
 ├── ui/
-│   ├── components/     # LivingCompassCanvas y GhbVoluntaryTrackerCard
-│   ├── navigation/     # BrujulaAppShell (navegación conectada entre las 7 pantallas)
+│   ├── components/     # LivingCompassCanvas (rosa náutica escultórica)
+│   ├── navigation/     # BrujulaAppShell (cabecera limpia + muelle flotante)
 │   ├── screens/        # Home, CheckIn, Zones, MyDay, Support, Progress y Settings
 │   └── BrujulaViewModel.kt
 ├── BrujulaApp.kt
@@ -75,27 +72,14 @@ app/src/main/java/es/brujula/jitai/
 ```
 
 - **Requisitos:** Android `minSdk 28` (Android 9+) · `targetSdk 35` · JDK 17 · Gradle 8.9 · Kotlin 2.0.21 · Compose BOM `2024.10.00`.
-- **Coste operativo:** `0 €` (persistencia 100 % local en Room + DataStore, cartografía vectorial propia en Compose `Canvas` y geolocalización nativa del sistema sin APIs externas ni telemetría de terceros).
+- **Coste operativo:** `0 €` (100 % local en el dispositivo, sin servidores ni APIs de pago).
 
 ---
 
 ## 5. Compilación e Instalación
 
-### Compilar APK de depuración instalable
-
 ```bash
 ./gradlew assembleDebug
-```
-
-La APK generada se ubicará en:
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-### Instalar y abrir mediante ADB
-
-```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n es.brujula.jitai/.MainActivity
 ```
@@ -104,4 +88,4 @@ adb shell am start -n es.brujula.jitai/.MainActivity
 
 ## 6. Nota Ética y Sanitaria
 
-BRÚJULA es una herramienta tecnológica de apoyo a la autogestión y reducción de daños diseñada en el marco de un proyecto universitario de innovación en salud digital. **No sustituye la valoración médica o enfermera presencial ni constituye un servicio de urgencias 24 horas.** Ante cualquier emergencia vital o sospecha de sobredosis, llama inmediatamente al **112**.
+BRÚJULA es una herramienta tecnológica de apoyo a la autogestión y reducción de daños diseñada en el marco de un proyecto universitario de innovación en salud digital. **No sustituye la valoración médica o enfermera presencial ni constituye un servicio de urgencias 24 horas.** Ante cualquier emergencia vital, llama inmediatamente al **112**.
